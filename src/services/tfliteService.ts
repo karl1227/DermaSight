@@ -18,7 +18,7 @@
  */
 
 import { loadTensorflowModel, type TfliteModel } from 'react-native-fast-tflite';
-import RNFS from 'react-native-fs';
+import { loadResizedImageRgb, type ImageSource } from './imageProcessingService';
 import {
   ClassificationResult,
   LesionClass,
@@ -54,8 +54,7 @@ let cachedModel: TfliteModel | null = null;
 
 /**
  * Load (or return cached) TFLite model.
- * Uses `{ url: 'file://...' }` pointing to the Android assets copy
- * made via RNFS, or falls back to require() bundled asset.
+ * Uses require() bundled asset via Metro asset registry.
  */
 async function getModel(): Promise<TfliteModel> {
   if (cachedModel) return cachedModel;
@@ -71,87 +70,20 @@ async function getModel(): Promise<TfliteModel> {
   return cachedModel;
 }
 
-// ─── Image decoding ──────────────────────────────────────────────────────────
+// ─── Image decoding & resizing ───────────────────────────────────────────────
 
 /**
- * Base64 decode polyfill for React Native Hermes (which lacks atob).
- * Decodes a base64 string into a Uint8Array.
+ * Resize image to 224×224 and decode the actual RGB pixels for the model.
  */
-function base64Decode(base64: string): Uint8Array {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let bufferLength = base64.length * 0.75;
-  if (base64[base64.length - 1] === '=') {
-    bufferLength--;
-    if (base64[base64.length - 2] === '=') {
-      bufferLength--;
-    }
-  }
+async function buildInputTensor(source: ImageSource): Promise<ArrayBuffer> {
+  const resizedRGB = await loadResizedImageRgb(source, MODEL_INPUT_SIZE);
 
-  const bytes = new Uint8Array(bufferLength);
-  let p = 0;
-
-  for (let i = 0; i < base64.length; i += 4) {
-    const encoded1 = chars.indexOf(base64[i]);
-    const encoded2 = chars.indexOf(base64[i + 1]);
-    const encoded3 = chars.indexOf(base64[i + 2]);
-    const encoded4 = chars.indexOf(base64[i + 3]);
-
-    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-    if (encoded3 !== 64) {
-      bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-    }
-    if (encoded4 !== 64) {
-      bytes[p++] = ((encoded3 & 3) << 6) | encoded4;
-    }
-  }
-
-  return bytes;
-}
-
-/**
- * Decode an image file at `imagePath` and build the model input tensor.
- *
- * react-native-fast-tflite works with raw ArrayBuffer, so we need to read
- * the JPEG/PNG into pixels. We use the RNFS base64 → manual JPEG decoder
- * approach since there is no canvas API in RN.
- *
- * Strategy:
- *   1. Read file as base64.
- *   2. Convert to binary buffer.
- *   3. For JPEG files, scan for the raw pixel data after decoding.
- *
- * NOTE: Full JPEG decoding in pure JS is heavyweight. For production-quality
- * inference, integrate a native image-resize module (e.g., vision-camera frame
- * processor, or react-native-image-resizer). Here we use a pragmatic approach:
- * read the raw bytes and sample every (fileSize / 150528) bytes as a proxy
- * for pixel values. This gives reasonable results while keeping zero native
- * dependencies beyond what's already installed.
- *
- * A proper implementation is commented below and can be swapped in when
- * react-native-image-resizer or a similar library is added.
- */
-async function buildInputTensor(imagePath: string): Promise<ArrayBuffer> {
-  // Clean path for RNFS (strip file:// prefix if present)
-  const cleanPath = imagePath.startsWith('file://')
-    ? imagePath.slice(7)
-    : imagePath;
-
-  // Read image as base64
-  const base64 = await RNFS.readFile(cleanPath, 'base64');
-
-  // Decode base64 → Uint8Array of raw file bytes
-  const fileBytes = base64Decode(base64);
-
-  // Build Float32Array input tensor [1 × 224 × 224 × 3]
-  // We sample uniformly across the file bytes as a proxy for pixel data.
-  // EfficientNetB0 handles internal scaling so we pass raw 0–255 values.
   const inputBuffer = new ArrayBuffer(MODEL_INPUT_ELEMENTS * 4); // float32
   const inputFloat32 = new Float32Array(inputBuffer);
-  const stride = Math.max(1, Math.floor(fileBytes.length / MODEL_INPUT_ELEMENTS));
 
   for (let i = 0; i < MODEL_INPUT_ELEMENTS; i++) {
-    // Sample file bytes cyclically to fill RGB channels
-    inputFloat32[i] = fileBytes[(i * stride) % fileBytes.length];
+    // EfficientNetB0 (HAM10000) expects pixel values in 0–255 range
+    inputFloat32[i] = resizedRGB[i];
   }
 
   return inputBuffer;
@@ -269,14 +201,14 @@ function applySymptomContext(
  * @returns Full ClassificationResult ready for the ResultScreen
  */
 export async function runInference(
-  imagePath: string,
+  source: ImageSource,
   symptoms: SelectedSymptoms,
 ): Promise<ClassificationResult> {
   // 1. Load model (cached after first call)
   const model = await getModel();
 
-  // 2. Build input tensor from image
-  const inputBuffer = await buildInputTensor(imagePath);
+  // 2. Build input tensor from image (proper JPEG decode + resize)
+  const inputBuffer = await buildInputTensor(source);
 
   // 3. Run inference
   const [outputBuffer] = await model.run([inputBuffer]);

@@ -48,7 +48,19 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
       Alert.alert('Error', 'No image was captured. Please try again.');
       return;
     }
-    navigation.navigate('ConfirmImage', { patientInfo, symptoms, imageUri: asset.uri });
+    navigation.navigate('ConfirmImage', {
+      patientInfo,
+      symptoms,
+      imageUri: asset.uri,
+      imagePath: asset.originalPath ?? asset.uri,
+      imageData: asset.base64,
+      imageType: asset.type,
+      imageMeta: {
+        width: asset.width,
+        height: asset.height,
+        fileSize: asset.fileSize,
+      },
+    });
   };
 
   const requestCameraPermission = async (): Promise<boolean> => {
@@ -95,7 +107,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
     setLoading(true);
-    launchCamera({ mediaType: 'photo', quality: 0.9, saveToPhotos: false, cameraType: 'back' }, handleImageResult);
+    launchCamera({ mediaType: 'photo', quality: 0.9, saveToPhotos: false, cameraType: 'back', includeBase64: true, includeExtra: true }, handleImageResult);
   };
 
   const handleGallery = async () => {
@@ -105,7 +117,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
     setLoading(true);
-    launchImageLibrary({ mediaType: 'photo', quality: 0.9, selectionLimit: 1 }, handleImageResult);
+    launchImageLibrary({ mediaType: 'photo', quality: 0.9, selectionLimit: 1, includeBase64: true, includeExtra: true }, handleImageResult);
   };
 
   return (
@@ -115,7 +127,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Image Capture</Text>
           <View style={{ width: 40 }} />
@@ -141,6 +153,10 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         </View>
+
+        <Text style={styles.captureHint}>
+          Tap Capture Image to open the phone camera in the system app.
+        </Text>
 
         {/* Patient strip */}
         <View style={styles.patientStrip}>
@@ -209,6 +225,12 @@ const styles = StyleSheet.create({
   scanCenter: { alignItems: 'center' },
   scanLabel: { fontSize: Typography.base, fontWeight: Typography.semiBold, color: Colors.accent },
   scanHint: { fontSize: Typography.xs, color: 'rgba(255,255,255,0.55)', marginTop: 4, textAlign: 'center' },
+  captureHint: {
+    fontSize: Typography.xs,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginBottom: Spacing.base,
+  },
   patientStrip: {
     backgroundColor: Colors.primaryUltraLight,
     borderRadius: Radius.md,

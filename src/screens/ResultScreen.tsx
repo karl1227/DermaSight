@@ -72,7 +72,8 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
         ],
       );
     } catch (err) {
-      Alert.alert('Error', 'Could not save the record. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      Alert.alert('Error', `Could not save the record. Details: ${errorMessage}`);
     } finally {
       setSaving(false);
     }

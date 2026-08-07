@@ -56,6 +56,15 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
 
+      <View style={styles.headerBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -98,6 +107,21 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface },
+  headerBar: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.xs,
+    paddingRight: Spacing.md,
+  },
+  backBtnText: {
+    fontSize: Typography.base,
+    color: Colors.primary,
+    fontWeight: Typography.medium,
+  },
   scroll: { flex: 1 },
   scrollContent: {
     padding: Spacing.xl,

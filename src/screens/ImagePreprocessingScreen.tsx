@@ -37,7 +37,8 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
   navigation,
   route,
 }) => {
-  const { patientInfo, symptoms, imageUri } = route.params;
+  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType } = route.params;
+  const sourceImagePath = imagePath ?? imageUri;
 
   const [stepStates, setStepStates] = useState<Record<string, StepState>>(
     Object.fromEntries(
@@ -51,12 +52,19 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
   /** Start preprocessing when the screen mounts */
   useEffect(() => {
     setIsRunning(true);
-    runPreprocessing(imageUri, (stepId, completed) => {
+    runPreprocessing(
+      {
+        base64: imageData,
+        mimeType: imageType,
+        filePath: sourceImagePath,
+      },
+      (stepId, completed) => {
       setStepStates(prev => ({
         ...prev,
         [stepId]: { started: true, completed },
       }));
-    })
+      },
+    )
       .then(result => {
         setProcessedUri(result);
         setIsRunning(false);
@@ -66,13 +74,16 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
         setIsRunning(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sourceImagePath, imageUri]);
 
   const handleContinue = () => {
     navigation.navigate('AIClassification', {
       patientInfo,
       symptoms,
       imageUri: processedUri ?? imageUri,
+      imagePath: sourceImagePath,
+      imageData,
+      imageType,
     });
   };
 

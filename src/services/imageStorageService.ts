@@ -35,6 +35,13 @@ export async function saveImageLocally(sourceUri: string): Promise<string> {
     ? sourceUri.slice(7)
     : sourceUri;
 
+  const exists = await RNFS.exists(cleanSource);
+  if (!exists) {
+    console.warn(`Source image does not exist (likely deleted by hot reload): ${cleanSource}`);
+    // If the file is gone, return an empty string rather than crashing the save process
+    return '';
+  }
+
   await RNFS.copyFile(cleanSource, destPath);
   return destPath;
 }

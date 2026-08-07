@@ -43,7 +43,8 @@ export const AIClassificationScreen: React.FC<Props> = ({
   navigation,
   route,
 }) => {
-  const { patientInfo, symptoms, imageUri } = route.params;
+  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType } = route.params;
+  const sourceImagePath = imagePath ?? imageUri;
 
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
@@ -89,7 +90,14 @@ export const AIClassificationScreen: React.FC<Props> = ({
         }
 
         // Run actual mock inference
-        const result = await runInference(imageUri, symptoms);
+        const result = await runInference(
+          {
+            base64: imageData,
+            mimeType: imageType,
+            filePath: sourceImagePath,
+          },
+          symptoms,
+        );
 
         navigation.replace('Result', {
           patientInfo,
@@ -98,14 +106,15 @@ export const AIClassificationScreen: React.FC<Props> = ({
           result,
         });
       } catch (err) {
-        setError('Classification failed. Please try again.');
+        const message = err instanceof Error ? err.message : 'Unknown runtime error';
+        setError(`Classification failed: ${message}`);
         setIsDone(true);
       }
     };
 
     runClassification();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [imagePath, imageUri, patientInfo, symptoms]);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -206,6 +215,20 @@ export const AIClassificationScreen: React.FC<Props> = ({
         {error && (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
+            <View style={styles.errorActions}>
+              <TouchableOpacity
+                style={styles.errorBtn}
+                onPress={() => navigation.goBack()}
+                activeOpacity={0.8}>
+                <Text style={styles.errorBtnText}>Go Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.errorBtn, styles.errorBtnPrimary]}
+                onPress={() => navigation.replace('AIClassification', { patientInfo, symptoms, imageUri, imagePath: sourceImagePath, imageData, imageType })}
+                activeOpacity={0.8}>
+                <Text style={[styles.errorBtnText, styles.errorBtnTextPrimary]}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -372,6 +395,31 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     color: Colors.danger,
     textAlign: 'center',
+  },
+  errorActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.base,
+  },
+  errorBtn: {
+    flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    paddingVertical: 11,
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+  },
+  errorBtnPrimary: {
+    backgroundColor: Colors.danger,
+  },
+  errorBtnText: {
+    fontSize: Typography.sm,
+    color: Colors.danger,
+    fontWeight: Typography.semiBold,
+  },
+  errorBtnTextPrimary: {
+    color: Colors.white,
   },
   footerNote: {
     backgroundColor: Colors.primaryUltraLight,

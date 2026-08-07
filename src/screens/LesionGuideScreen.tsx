@@ -129,14 +129,23 @@ const ASSESSMENT_LEVELS = [
   { dot: Colors.greenDot, label: 'Generally Benign', classes: 'Melanocytic Nevi, Benign Keratosis, Dermatofibroma, Vascular Lesions' },
 ];
 
-export const LesionGuideScreen: React.FC<Props> = () => {
+export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
   const [abcdeExpanded, setAbcdeExpanded] = useState(false);
+  const canGoBack = navigation?.canGoBack?.();
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
       <View style={styles.header}>
+        {canGoBack && (
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.75}>
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.headerTitle}>Pigmented Skin Lesion Guide</Text>
         <Text style={styles.headerSubtitle}>
           Educational reference · Not for self-diagnosis
@@ -230,6 +239,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+  },
+  backBtn: {
+    marginBottom: Spacing.xs,
+  },
+  backBtnText: {
+    fontSize: Typography.base,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: Typography.medium,
   },
   headerTitle: {
     fontSize: Typography.xl,

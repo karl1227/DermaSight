@@ -58,6 +58,12 @@ export type StepProgressCallback = (
   completed: boolean,
 ) => void;
 
+export interface PreprocessingImageSource {
+  base64?: string;
+  mimeType?: string;
+  filePath?: string;
+}
+
 /**
  * Run the preprocessing pipeline with step-by-step progress updates.
  * Returns the processed image path (original path for now — in production,
@@ -67,7 +73,7 @@ export type StepProgressCallback = (
  * @param onStepUpdate - Callback fired when each step starts and completes
  */
 export async function runPreprocessing(
-  imagePath: string,
+  imageSource: string | PreprocessingImageSource,
   onStepUpdate: StepProgressCallback,
 ): Promise<string> {
   for (const step of PREPROCESSING_STEPS) {
@@ -83,5 +89,9 @@ export async function runPreprocessing(
 
   // In production: return path to the resized/processed image
   // For now: return the original path unchanged
-  return imagePath;
+  if (typeof imageSource === 'string') {
+    return imageSource;
+  }
+
+  return imageSource.filePath ?? '';
 }

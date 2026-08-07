@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
+import { assessImageQuality, type QualityCheck } from '../services/imageProcessingService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ConfirmImage'>;
@@ -23,21 +25,48 @@ type Props = {
 const { width } = Dimensions.get('window');
 const IMAGE_SIZE = width - Spacing.xl * 2;
 
-interface QualityCheck {
-  id: string;
-  label: string;
-  status: 'pass' | 'info';
-}
-
-const QUALITY_CHECKS: QualityCheck[] = [
-  { id: 'clarity', label: 'Image clarity check', status: 'pass' },
-  { id: 'lighting', label: 'Lighting quality assessed', status: 'pass' },
-  { id: 'centered', label: 'Lesion centered', status: 'info' },
-  { id: 'ready', label: 'Ready for analysis', status: 'pass' },
-];
-
 export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { patientInfo, symptoms, imageUri } = route.params;
+  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType, imageMeta } = route.params;
+  const [qualityChecks, setQualityChecks] = React.useState<QualityCheck[]>([]);
+  const [qualitySummary, setQualitySummary] = React.useState('Assessing image quality...');
+  const [isAssessing, setIsAssessing] = React.useState(true);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    assessImageQuality(
+      {
+        base64: imageData,
+        mimeType: imageType,
+        filePath: imagePath ?? imageUri,
+      },
+      imageMeta,
+    )
+      .then(result => {
+        if (!isMounted) return;
+        setQualityChecks(result.checks);
+        setQualitySummary(result.summary);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setQualityChecks([
+          {
+            id: 'quality-error',
+            label: 'Image quality check unavailable',
+            status: 'info',
+            detail: 'The image could not be analyzed automatically, but you can still continue if it looks clear.',
+          },
+        ]);
+        setQualitySummary('Automatic quality analysis could not be completed.');
+      })
+      .finally(() => {
+        if (isMounted) setIsAssessing(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [imageMeta, imageUri]);
 
   return (
     <View style={styles.container}>
@@ -72,28 +101,43 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Quality assessment */}
         <View style={styles.qualityCard}>
           <Text style={styles.qualityTitle}>Image Quality Assessment</Text>
-          {QUALITY_CHECKS.map(item => (
-            <View key={item.id} style={styles.qualityRow}>
-              <Text style={styles.qualityLabel}>{item.label}</Text>
-              <View
-                style={[
-                  styles.qualityBadge,
-                  item.status === 'pass'
-                    ? styles.qualityPass
-                    : styles.qualityInfo,
-                ]}>
-                <Text
-                  style={[
-                    styles.qualityBadgeText,
-                    item.status === 'pass'
-                      ? styles.qualityPassText
-                      : styles.qualityInfoText,
-                  ]}>
-                  {item.status === 'pass' ? 'Good' : 'Verify'}
-                </Text>
-              </View>
+          <Text style={styles.qualitySummary}>{qualitySummary}</Text>
+          {isAssessing ? (
+            <View style={styles.qualityLoadingRow}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.qualityLoadingText}>Analyzing lighting, sharpness, and resolution...</Text>
             </View>
-          ))}
+          ) : (
+            qualityChecks.map(item => (
+              <View key={item.id} style={styles.qualityItem}>
+                <View style={styles.qualityRow}>
+                  <Text style={styles.qualityLabel}>{item.label}</Text>
+                  <View
+                    style={[
+                      styles.qualityBadge,
+                      item.status === 'pass'
+                        ? styles.qualityPass
+                        : item.status === 'warn'
+                          ? styles.qualityWarn
+                          : styles.qualityInfo,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.qualityBadgeText,
+                        item.status === 'pass'
+                          ? styles.qualityPassText
+                          : item.status === 'warn'
+                            ? styles.qualityWarnText
+                            : styles.qualityInfoText,
+                      ]}>
+                      {item.status === 'pass' ? 'Good' : item.status === 'warn' ? 'Review' : 'Info'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.qualityDetail}>{item.detail}</Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Patient info */}
@@ -121,6 +165,9 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
               patientInfo,
               symptoms,
               imageUri,
+              imagePath,
+              imageData,
+              imageType,
             })
           }
           size="lg"
@@ -200,12 +247,31 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
-  qualityRow: {
+  qualitySummary: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    lineHeight: Typography.sm * 1.45,
+  },
+  qualityLoadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  qualityLoadingText: {
+    fontSize: Typography.sm,
+    color: Colors.textMuted,
+    flex: 1,
+  },
+  qualityItem: {
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
+  },
+  qualityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   qualityLabel: {
     flex: 1,
@@ -219,10 +285,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   qualityPass: { backgroundColor: Colors.successLight },
+  qualityWarn: { backgroundColor: 'rgba(245, 158, 11, 0.16)' },
   qualityInfo: { backgroundColor: Colors.primaryUltraLight },
   qualityBadgeText: { fontSize: Typography.xs, fontWeight: Typography.semiBold },
   qualityPassText: { color: Colors.success },
+  qualityWarnText: { color: '#B45309' },
   qualityInfoText: { color: Colors.primary },
+  qualityDetail: {
+    marginTop: 4,
+    fontSize: Typography.xs,
+    color: Colors.textMuted,
+    lineHeight: Typography.xs * 1.45,
+  },
   infoCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,

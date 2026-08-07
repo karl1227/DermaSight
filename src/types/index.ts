@@ -103,16 +103,30 @@ export type RootStackParamList = {
     patientInfo: PatientInfo;
     symptoms: SelectedSymptoms;
     imageUri: string;
+    imagePath?: string;
+    imageData?: string;
+    imageType?: string;
+    imageMeta?: {
+      width?: number;
+      height?: number;
+      fileSize?: number;
+    };
   };
   ImagePreprocessing: {
     patientInfo: PatientInfo;
     symptoms: SelectedSymptoms;
     imageUri: string;
+    imagePath?: string;
+    imageData?: string;
+    imageType?: string;
   };
   AIClassification: {
     patientInfo: PatientInfo;
     symptoms: SelectedSymptoms;
     imageUri: string;
+    imagePath?: string;
+    imageData?: string;
+    imageType?: string;
   };
   Result: {
     patientInfo: PatientInfo;
