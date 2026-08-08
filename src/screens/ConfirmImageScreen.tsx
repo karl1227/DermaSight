@@ -76,7 +76,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Retake</Text>
+          <Text style={styles.backText}>‹ Retake</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Confirm Captured Image</Text>
       </View>
