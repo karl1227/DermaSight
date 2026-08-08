@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,7 +12,7 @@ import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'PrivacyConsent'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'SettingsPrivacyConsent'>;
 };
 
 interface Section {
@@ -48,7 +47,7 @@ const SECTIONS: Section[] = [
   },
   {
     icon: 'x',
-    title: 'What We Don\'t Do',
+    title: "What We Don't Do",
     preamble: 'DermaSight is designed with your privacy in mind:',
     items: [
       'No data uploads to external servers',
@@ -59,7 +58,7 @@ const SECTIONS: Section[] = [
   },
 ];
 
-// ─── Small inline icon components ────────────────────────────────────────────
+// ─── Icon components ──────────────────────────────────────────────────────────
 
 const DbIcon = () => (
   <View style={iconS.db}>
@@ -94,45 +93,23 @@ const XIcon = () => (
 
 const ICONS = { db: DbIcon, wifi: WifiIcon, x: XIcon };
 
-export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
-  const handleCancel = () => {
-    Alert.alert(
-      'Cancel',
-      'You must agree to continue using SkinSense. Go back?',
-      [
-        { text: 'Stay', style: 'cancel' },
-        { text: 'Go Back', onPress: () => navigation.goBack() },
-      ],
-    );
-  };
-
+export const SettingsPrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={handleCancel}
-          activeOpacity={0.7}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backChevron}>‹</Text>
+          <Text style={styles.headerTitle}>Privacy & Data Consent</Text>
         </TouchableOpacity>
+        <Text style={styles.headerSubtitle}>Your data security and privacy matter</Text>
       </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-
-        {/* Shield icon + header */}
-        <View style={styles.headerArea}>
-          <View style={styles.iconCircle}>
-            {/* Shield outline */}
-            <View style={styles.shield} />
-          </View>
-          <Text style={styles.pageTitle}>Privacy & Data Consent</Text>
-          <Text style={styles.pageSubtitle}>Your data security and privacy matter</Text>
-        </View>
 
         {SECTIONS.map((section) => {
           const Icon = ICONS[section.icon];
@@ -157,22 +134,12 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
           );
         })}
 
-        {/* Buttons */}
-        <View style={styles.buttonGroup}>
-          <TouchableOpacity
-            style={styles.agreeBtn}
-            onPress={() => navigation.replace('MainTabs')}
-            activeOpacity={0.85}>
-            <Text style={styles.agreeBtnText}>Agree and Continue</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={handleCancel}
-            activeOpacity={0.7}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.doneBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.85}>
+          <Text style={styles.doneBtnText}>Done</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -188,118 +155,57 @@ const iconS = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 2,
   },
-  dbTop: {
-    width: 18,
-    height: 5,
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  dbMid: {
-    width: 18,
-    height: 5,
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  dbBot: {
-    width: 18,
-    height: 5,
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  wifi: {
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  wifiArc: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    borderTopWidth: 0,
-  },
-  wifiDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.primary,
-    position: 'absolute',
-    bottom: 0,
-  },
-  xWrapper: {
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  xText: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    fontWeight: Typography.bold,
-  },
+  dbTop: { width: 18, height: 5, borderRadius: 2, borderWidth: 1.5, borderColor: Colors.primary },
+  dbMid: { width: 18, height: 5, borderRadius: 2, borderWidth: 1.5, borderColor: Colors.primary },
+  dbBot: { width: 18, height: 5, borderRadius: 2, borderWidth: 1.5, borderColor: Colors.primary },
+  wifi: { width: 18, height: 18, alignItems: 'center', position: 'relative' },
+  wifiArc: { position: 'absolute', borderWidth: 2, borderColor: Colors.primary, borderTopWidth: 0 },
+  wifiDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.primary, position: 'absolute', bottom: 0 },
+  xWrapper: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  xText: { fontSize: 14, color: Colors.textMuted, fontWeight: Typography.bold },
 });
 
 // ─── Screen styles ────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  topBar: {
+  header: {
+    backgroundColor: Colors.primary,
+    paddingTop: Spacing.xxxl,
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xs,
+    paddingBottom: Spacing.xl,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
   backBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: Spacing.xs,
-    paddingRight: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
-  backBtnText: {
+  backChevron: {
+    fontSize: Typography.xxl,
+    fontWeight: Typography.bold,
+    color: Colors.white,
+    lineHeight: Typography.xxl,
+    marginTop: -2,
+  },
+  headerTitle: {
+    fontSize: Typography.xxl,
+    fontWeight: Typography.extraBold,
+    color: Colors.white,
+    flex: 1,
+  },
+  headerSubtitle: {
     fontSize: Typography.base,
-    color: Colors.primary,
-    fontWeight: Typography.medium,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: Typography.base * 1.5,
   },
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xxxl,
     paddingTop: Spacing.xl,
-  },
-  headerArea: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primaryUltraLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.base,
-  },
-  shield: {
-    width: 28,
-    height: 32,
-    borderWidth: 2.5,
-    borderColor: Colors.primary,
-    borderRadius: 6,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-  },
-  pageTitle: {
-    fontSize: Typography.xl,
-    fontWeight: Typography.bold,
-    color: Colors.primary,
-    textAlign: 'center',
-    marginBottom: Spacing.xs,
-  },
-  pageSubtitle: {
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    textAlign: 'center',
   },
   card: {
     backgroundColor: Colors.surface,
@@ -354,28 +260,16 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
-  buttonGroup: {
-    marginTop: Spacing.base,
-    gap: Spacing.sm,
-  },
-  agreeBtn: {
+  doneBtn: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.pill,
     paddingVertical: 18,
     alignItems: 'center',
+    marginTop: Spacing.base,
   },
-  agreeBtnText: {
+  doneBtnText: {
     fontSize: Typography.md,
     fontWeight: Typography.semiBold,
     color: Colors.white,
-  },
-  cancelBtn: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontSize: Typography.base,
-    color: Colors.textMuted,
-    fontWeight: Typography.medium,
   },
 });

@@ -40,6 +40,8 @@ import { MedicalDisclaimerScreen } from '../screens/MedicalDisclaimerScreen';
 import { PrivacyConsentScreen } from '../screens/PrivacyConsentScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { SettingsMedicalDisclaimerScreen } from '../screens/SettingsMedicalDisclaimerScreen';
+import { SettingsPrivacyConsentScreen } from '../screens/SettingsPrivacyConsentScreen';
 import { PatientInfoScreen } from '../screens/PatientInfoScreen';
 import { SymptomChecklistScreen } from '../screens/SymptomChecklistScreen';
 import { CameraScreen } from '../screens/CameraScreen';
@@ -147,6 +149,8 @@ export function AppNavigator() {
         <Stack.Screen name="Landing" component={LandingScreen} />
         <Stack.Screen name="MedicalDisclaimer" component={MedicalDisclaimerScreen} />
         <Stack.Screen name="PrivacyConsent" component={PrivacyConsentScreen} />
+        <Stack.Screen name="SettingsMedicalDisclaimer" component={SettingsMedicalDisclaimerScreen} />
+        <Stack.Screen name="SettingsPrivacyConsent" component={SettingsPrivacyConsentScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="PatientInfo" component={PatientInfoScreen} />

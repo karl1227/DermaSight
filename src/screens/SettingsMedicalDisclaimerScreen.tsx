@@ -12,7 +12,7 @@ import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'MedicalDisclaimer'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'SettingsMedicalDisclaimer'>;
 };
 
 interface DisclaimerItem {
@@ -51,35 +51,23 @@ const DISCLAIMERS: DisclaimerItem[] = [
   },
 ];
 
-export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
+export const SettingsMedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      <View style={styles.headerBar}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}>
-          <Text style={styles.backBtnText}>‹ Back</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backChevron}>‹</Text>
+          <Text style={styles.headerTitle}>Medical Disclaimer</Text>
         </TouchableOpacity>
+        <Text style={styles.headerSubtitle}>Read before using DermaSight</Text>
       </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-
-        {/* Warning icon */}
-        <View style={styles.iconWrapper}>
-          <View style={styles.iconCircle}>
-            {/* Triangle warning */}
-            <View style={styles.triangle} />
-            <Text style={styles.exclamation}>!</Text>
-          </View>
-        </View>
-
-        <Text style={styles.pageTitle}>Medical Safety Disclaimer</Text>
 
         {DISCLAIMERS.map((item, idx) => (
           <View
@@ -94,10 +82,10 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.bottomButtons}>
           <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={() => navigation.navigate('PrivacyConsent')}
+            style={styles.doneBtn}
+            onPress={() => navigation.goBack()}
             activeOpacity={0.85}>
-            <Text style={styles.continueBtnText}>I Understand, Continue</Text>
+            <Text style={styles.doneBtnText}>Done</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -106,74 +94,49 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-  headerBar: {
+  container: { flex: 1, backgroundColor: Colors.background },
+  header: {
+    backgroundColor: Colors.primary,
+    paddingTop: Spacing.xxxl,
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xs,
+    paddingBottom: Spacing.xl,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
   },
   backBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: Spacing.xs,
-    paddingRight: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
-  backBtnText: {
+  backChevron: {
+    fontSize: Typography.xxl,
+    fontWeight: Typography.bold,
+    color: Colors.white,
+    lineHeight: Typography.xxl,
+    marginTop: -2,
+  },
+  headerTitle: {
+    fontSize: Typography.xxl,
+    fontWeight: Typography.extraBold,
+    color: Colors.white,
+    flex: 1,
+  },
+  headerSubtitle: {
     fontSize: Typography.base,
-    color: Colors.primary,
-    fontWeight: Typography.medium,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: Typography.base * 1.5,
   },
   scroll: { flex: 1 },
   scrollContent: {
     padding: Spacing.xl,
     paddingBottom: Spacing.xxxl,
-    alignItems: 'center',
-  },
-  iconWrapper: {
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.xl,
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.dangerLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  triangle: {
-    position: 'absolute',
-    width: 0,
-    height: 0,
-    borderLeftWidth: 16,
-    borderRightWidth: 16,
-    borderBottomWidth: 28,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: Colors.danger,
-    top: 16,
-  },
-  exclamation: {
-    fontSize: Typography.md,
-    fontWeight: Typography.bold,
-    color: Colors.white,
-    position: 'absolute',
-    top: 28,
-  },
-  pageTitle: {
-    fontSize: Typography.xl,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: Spacing.xl,
-    alignSelf: 'stretch',
   },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.base,
     marginBottom: Spacing.md,
-    alignSelf: 'stretch',
     borderWidth: 1,
     borderColor: Colors.borderLight,
   },
@@ -192,16 +155,15 @@ const styles = StyleSheet.create({
     lineHeight: Typography.sm * 1.65,
   },
   bottomButtons: {
-    alignSelf: 'stretch',
     marginTop: Spacing.base,
   },
-  continueBtn: {
+  doneBtn: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.pill,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  continueBtnText: {
+  doneBtnText: {
     fontSize: Typography.md,
     fontWeight: Typography.semiBold,
     color: Colors.white,

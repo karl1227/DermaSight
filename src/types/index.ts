@@ -94,6 +94,8 @@ export type RootStackParamList = {
   Landing: undefined;
   MedicalDisclaimer: undefined;
   PrivacyConsent: undefined;
+  SettingsMedicalDisclaimer: undefined;
+  SettingsPrivacyConsent: undefined;
   MainTabs: undefined;
   Settings: undefined;
   PatientInfo: undefined;
