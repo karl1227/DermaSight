@@ -39,7 +39,19 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.settingsBtn}
           onPress={() => navigation.navigate('Settings')}
           activeOpacity={0.75}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
+          {/* Minimal gear icon */}
+          <View style={styles.gearOuter}>
+            <View style={styles.gearInner} />
+            {/* Gear teeth - top, bottom, left, right */}
+            <View style={[styles.gearTooth, styles.gearToothTop]} />
+            <View style={[styles.gearTooth, styles.gearToothBottom]} />
+            <View style={[styles.gearTooth, styles.gearToothLeft]} />
+            <View style={[styles.gearTooth, styles.gearToothRight]} />
+            <View style={[styles.gearTooth, styles.gearToothTL]} />
+            <View style={[styles.gearTooth, styles.gearToothTR]} />
+            <View style={[styles.gearTooth, styles.gearToothBL]} />
+            <View style={[styles.gearTooth, styles.gearToothBR]} />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -129,9 +141,37 @@ const styles = StyleSheet.create({
     marginTop: 4,
     padding: Spacing.sm,
   },
-  settingsIcon: {
-    fontSize: 24,
+  gearOuter: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  gearInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: Colors.textMuted,
+  },
+  gearTooth: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderRadius: 1,
+    backgroundColor: Colors.textMuted,
+  },
+  gearToothTop:    { top: -3,  left: 8 },
+  gearToothBottom: { bottom: -3, left: 8 },
+  gearToothLeft:   { left: -3, top: 8 },
+  gearToothRight:  { right: -3, top: 8 },
+  gearToothTL:     { top: 0,   left: 0,   transform: [{ rotate: '45deg' }] },
+  gearToothTR:     { top: 0,   right: 0,  transform: [{ rotate: '45deg' }] },
+  gearToothBL:     { bottom: 0, left: 0,  transform: [{ rotate: '45deg' }] },
+  gearToothBR:     { bottom: 0, right: 0, transform: [{ rotate: '45deg' }] },
   ctaArea: {
     flex: 1,
     alignItems: 'center',

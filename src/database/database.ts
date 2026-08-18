@@ -122,3 +122,17 @@ export async function deleteAllScreenings(): Promise<void> {
   const database = await getDb();
   await database.execute('DELETE FROM screenings');
 }
+
+/** Update patient info fields (full_name, age, sex) for a record */
+export async function updatePatientInfo(
+  id: number,
+  fullName: string,
+  age: number,
+  sex: string,
+): Promise<void> {
+  const database = await getDb();
+  await database.execute(
+    'UPDATE screenings SET full_name = ?, age = ?, sex = ? WHERE id = ?',
+    [fullName, age, sex, id],
+  );
+}

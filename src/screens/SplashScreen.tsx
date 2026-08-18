@@ -46,7 +46,7 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.appName}>SkinSense</Text>
+        <Text style={styles.appName}>DermaSight</Text>
         <Text style={styles.subtitle}>AI-Assisted Pigmented Skin Lesion Screening</Text>
 
         {/* Loading dots */}

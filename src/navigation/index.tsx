@@ -65,20 +65,70 @@ const Tab = createBottomTabNavigator<TabParamList>();
  */
 let _sessionInitialised = false;
 
-// ─── Tab icon component ───────────────────────────────────────────────────────
+// ─── Minimal line icons ───────────────────────────────────────────────────────
+
+const HomeIcon: React.FC<{ color: string }> = ({ color }) => (
+  <View style={iconStyles.wrapper}>
+    <View style={iconStyles.homeContainer}>
+      {/* Roof: two rectangles that form a /\ shape using skew */}
+      <View style={iconStyles.roofRow}>
+        <View style={[iconStyles.roofLeft, { backgroundColor: color }]} />
+        <View style={[iconStyles.roofRight, { backgroundColor: color }]} />
+      </View>
+      {/* House body */}
+      <View style={[iconStyles.houseBody, { borderColor: color }]}>
+        {/* Door */}
+        <View style={[iconStyles.door, { borderColor: color }]} />
+      </View>
+    </View>
+  </View>
+);
+
+const HistoryIcon: React.FC<{ color: string }> = ({ color }) => (
+  <View style={iconStyles.wrapper}>
+    {/* Clipboard outline */}
+    <View style={[iconStyles.clipboard, { borderColor: color }]}>
+      {/* Clip tab at top */}
+      <View style={[iconStyles.clipTab, { borderColor: color, backgroundColor: 'transparent' }]} />
+      {/* Lines */}
+      <View style={[iconStyles.line, { backgroundColor: color, marginTop: 10 }]} />
+      <View style={[iconStyles.line, { backgroundColor: color, width: 10 }]} />
+      <View style={[iconStyles.line, { backgroundColor: color, width: 14 }]} />
+    </View>
+  </View>
+);
+
+const GuideIcon: React.FC<{ color: string }> = ({ color }) => (
+  <View style={iconStyles.wrapper}>
+    {/* Book outline */}
+    <View style={[iconStyles.book, { borderColor: color }]}>
+      {/* Spine line */}
+      <View style={[iconStyles.spine, { backgroundColor: color }]} />
+      {/* Text lines */}
+      <View style={[iconStyles.bookLine, { backgroundColor: color, marginTop: 5 }]} />
+      <View style={[iconStyles.bookLine, { backgroundColor: color }]} />
+      <View style={[iconStyles.bookLine, { backgroundColor: color, width: 8 }]} />
+    </View>
+  </View>
+);
+
+// ─── Tab icon wrapper ─────────────────────────────────────────────────────────
 
 interface TabIconProps {
-  emoji: string;
+  Icon: React.FC<{ color: string }>;
   label: string;
   focused: boolean;
 }
 
-const TabIcon: React.FC<TabIconProps> = ({ emoji, label, focused }) => (
-  <View style={tabStyles.iconWrapper}>
-    <Text style={tabStyles.emoji}>{emoji}</Text>
-    <Text style={[tabStyles.label, focused && tabStyles.labelFocused]}>{label}</Text>
-  </View>
-);
+const TabIcon: React.FC<TabIconProps> = ({ Icon, label, focused }) => {
+  const color = focused ? Colors.primary : Colors.textMuted;
+  return (
+    <View style={tabStyles.iconWrapper}>
+      <Icon color={color} />
+      <Text style={[tabStyles.label, focused && tabStyles.labelFocused]}>{label}</Text>
+    </View>
+  );
+};
 
 // ─── Bottom Tab Navigator ─────────────────────────────────────────────────────
 
@@ -97,7 +147,7 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🏠" label="Home" focused={focused} />
+            <TabIcon Icon={HomeIcon} label="Home" focused={focused} />
           ),
         }}
       />
@@ -106,7 +156,7 @@ function MainTabs() {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📋" label="History" focused={focused} />
+            <TabIcon Icon={HistoryIcon} label="History" focused={focused} />
           ),
         }}
       />
@@ -115,7 +165,7 @@ function MainTabs() {
         component={LesionGuideScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📖" label="Guide" focused={focused} />
+            <TabIcon Icon={GuideIcon} label="Guide" focused={focused} />
           ),
         }}
       />
@@ -197,9 +247,6 @@ const tabStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
-  emoji: {
-    fontSize: 20,
-  },
   label: {
     fontSize: 10,
     color: Colors.textMuted,
@@ -208,5 +255,98 @@ const tabStyles = StyleSheet.create({
   labelFocused: {
     color: Colors.primary,
     fontWeight: Typography.semiBold,
+  },
+});
+
+// ─── Icon geometry styles ─────────────────────────────────────────────────────
+
+const iconStyles = StyleSheet.create({
+  wrapper: {
+    width: 22,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  // Home icon
+  homeContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  roofRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 0,
+  },
+  roofLeft: {
+    width: 11,
+    height: 2,
+    borderRadius: 1,
+    transform: [{ rotate: '-35deg' }, { translateY: 2 }],
+  },
+  roofRight: {
+    width: 11,
+    height: 2,
+    borderRadius: 1,
+    transform: [{ rotate: '35deg' }, { translateY: 2 }],
+  },
+  houseBody: {
+    width: 14,
+    height: 10,
+    borderWidth: 1.5,
+    borderTopWidth: 0,
+    borderRadius: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  door: {
+    width: 4,
+    height: 6,
+    borderWidth: 1.5,
+    borderBottomWidth: 0,
+    borderRadius: 1,
+  },
+  // History / clipboard icon
+  clipboard: {
+    width: 14,
+    height: 17,
+    borderWidth: 1.5,
+    borderRadius: 2,
+    alignItems: 'center',
+  },
+  clipTab: {
+    position: 'absolute',
+    top: -3,
+    width: 6,
+    height: 4,
+    borderWidth: 1.5,
+    borderRadius: 1,
+  },
+  line: {
+    height: 1.5,
+    width: 8,
+    borderRadius: 1,
+    marginTop: 3,
+  },
+  // Guide / book icon
+  book: {
+    width: 16,
+    height: 18,
+    borderWidth: 1.5,
+    borderRadius: 2,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  spine: {
+    width: 1.5,
+    height: '100%',
+  },
+  bookLine: {
+    position: 'absolute',
+    height: 1.5,
+    width: 7,
+    borderRadius: 1,
+    right: 2,
   },
 });

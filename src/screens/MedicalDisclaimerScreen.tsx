@@ -18,36 +18,30 @@ type Props = {
 interface DisclaimerItem {
   title: string;
   body: string;
+  citation: string;
   titleColor: string;
   danger?: boolean;
 }
 
 const DISCLAIMERS: DisclaimerItem[] = [
   {
-    title: 'Educational Use Only',
-    body: 'DermaSight provides preliminary educational screening only. It is designed to raise awareness about pigmented skin lesions.',
+    title: 'Educational Screening Only',
+    body: 'Serves as a preliminary awareness tool, not a diagnostic system.',
+    citation: 'Vodrahalli et al., 2023',
     titleColor: Colors.primary,
   },
   {
-    title: 'Not a Medical Diagnosis',
-    body: 'This application does not diagnose any medical condition. Results are for informational purposes and should not replace professional medical advice.',
+    title: 'No Professional Replacement',
+    body: 'Results do not replace clinical consultation or treatment plans from licensed dermatologists.',
+    citation: 'Buenaflor, 2026',
     titleColor: Colors.primary,
   },
   {
-    title: 'Consult Licensed Professionals',
-    body: 'The app does not replace consultations with licensed dermatologists or healthcare providers. Always seek professional medical evaluation.',
-    titleColor: Colors.primary,
-  },
-  {
-    title: 'Seek Immediate Care If:',
-    body: 'The lesion is bleeding, painful, rapidly changing, or appears suspicious. Do not wait for screening results.',
+    title: 'Seek Immediate Care',
+    body: 'Consult a doctor immediately if lesions bleed, hurt, or change rapidly.',
+    citation: 'Abbasi et al., 2004',
     titleColor: Colors.danger,
     danger: true,
-  },
-  {
-    title: 'No Treatment Recommendations',
-    body: 'DermaSight does not provide treatment plans, medication advice, or therapeutic recommendations of any kind.',
-    titleColor: Colors.primary,
   },
 ];
 
@@ -88,7 +82,11 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={[styles.cardTitle, { color: item.titleColor }]}>
               {item.title}
             </Text>
-            <Text style={styles.cardBody}>{item.body}</Text>
+            <View style={styles.bulletRow}>
+              <View style={[styles.bulletDot, item.danger && styles.bulletDotDanger]} />
+              <Text style={styles.cardBody}>{item.body}</Text>
+            </View>
+            <Text style={styles.citation}>{item.citation}</Text>
           </View>
         ))}
 
@@ -179,17 +177,41 @@ const styles = StyleSheet.create({
   },
   cardDanger: {
     borderColor: '#FFCDD2',
-    backgroundColor: '#FFFBFB',
+    backgroundColor: '#FFEEEE',
   },
   cardTitle: {
     fontSize: Typography.base,
     fontWeight: Typography.semiBold,
     marginBottom: Spacing.sm,
   },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
+  },
+  bulletDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    marginTop: 7,
+    marginRight: 10,
+    flexShrink: 0,
+  },
+  bulletDotDanger: {
+    backgroundColor: Colors.danger,
+  },
   cardBody: {
     fontSize: Typography.sm,
     color: Colors.textSecondary,
     lineHeight: Typography.sm * 1.65,
+    flex: 1,
+  },
+  citation: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: '#666666',
+    marginTop: Spacing.xs,
   },
   bottomButtons: {
     alignSelf: 'stretch',

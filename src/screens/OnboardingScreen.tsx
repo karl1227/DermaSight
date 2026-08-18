@@ -161,7 +161,7 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.nextBtn} onPress={goToNext} activeOpacity={0.85}>
           <Text style={styles.nextBtnText}>
-            {currentIndex < SLIDES.length - 1 ? 'Next →' : 'Get Started →'}
+            {currentIndex < SLIDES.length - 1 ? 'Next' : 'Get Started'}
           </Text>
         </TouchableOpacity>
       </View>

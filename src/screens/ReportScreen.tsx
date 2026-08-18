@@ -9,6 +9,10 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -16,7 +20,7 @@ import { RootStackParamList, ScreeningRecord, ScreeningStatus } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
 import { DisclaimerCard } from '../components/DisclaimerCard';
-import { getScreeningById, deleteScreening } from '../database/database';
+import { getScreeningById, deleteScreening, updatePatientInfo } from '../database/database';
 import { deleteLocalImage, toImageUri } from '../services/imageStorageService';
 import { formatDate, formatConfidence, getStatusColor, safeJsonParse } from '../utils';
 
@@ -30,11 +34,56 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
   const [record, setRecord] = useState<ScreeningRecord | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Edit modal state
+  const [editVisible, setEditVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAge, setEditAge] = useState('');
+  const [editSex, setEditSex] = useState('');
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     getScreeningById(recordId)
       .then(r => setRecord(r))
       .finally(() => setLoading(false));
   }, [recordId]);
+
+  const openEdit = () => {
+    if (!record) return;
+    setEditName(record.full_name);
+    setEditAge(record.age.toString());
+    setEditSex(record.sex);
+    setEditVisible(true);
+  };
+
+  const handleSave = async () => {
+    const trimmedName = editName.trim();
+    const parsedAge = parseInt(editAge, 10);
+
+    if (!trimmedName) {
+      Alert.alert('Validation', 'Full name cannot be empty.');
+      return;
+    }
+    if (isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120) {
+      Alert.alert('Validation', 'Please enter a valid age (1–120).');
+      return;
+    }
+    if (!['Male', 'Female', 'Other'].includes(editSex)) {
+      Alert.alert('Validation', 'Please select a valid sex option.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePatientInfo(recordId, trimmedName, parsedAge, editSex);
+      const updated = await getScreeningById(recordId);
+      setRecord(updated);
+      setEditVisible(false);
+    } catch {
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDelete = () => {
     Alert.alert(
@@ -154,7 +203,15 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Patient Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Patient Information</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Patient Information</Text>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={openEdit}
+              activeOpacity={0.7}>
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          </View>
           <InfoRow label="Patient ID" value={record.patient_id} />
           <View style={styles.divider} />
           <InfoRow label="Full Name" value={record.full_name} />
@@ -245,6 +302,96 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           size="md"
         />
       </ScrollView>
+
+      {/* ── Edit Patient Info Modal ── */}
+      <Modal
+        visible={editVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditVisible(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+
+            <Text style={styles.modalTitle}>Edit Patient Info</Text>
+            <Text style={styles.modalSubtitle}>
+              Update Full Name, Age, and Sex
+            </Text>
+
+            {/* Full Name */}
+            <Text style={styles.fieldLabel}>Full Name</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Enter full name"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="words"
+              returnKeyType="next"
+            />
+
+            {/* Age */}
+            <Text style={styles.fieldLabel}>Age</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editAge}
+              onChangeText={setEditAge}
+              placeholder="Enter age"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+              maxLength={3}
+              returnKeyType="next"
+            />
+
+            {/* Sex */}
+            <Text style={styles.fieldLabel}>Sex</Text>
+            <View style={styles.sexRow}>
+              {(['Male', 'Female', 'Other'] as const).map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.sexOption,
+                    editSex === option && styles.sexOptionActive,
+                  ]}
+                  onPress={() => setEditSex(option)}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.sexOptionText,
+                      editSex === option && styles.sexOptionTextActive,
+                    ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
+                onPress={() => setEditVisible(false)}
+                activeOpacity={0.7}
+                disabled={saving}>
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+                onPress={handleSave}
+                activeOpacity={0.85}
+                disabled={saving}>
+                {saving ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -310,11 +457,28 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
     ...Shadow.card,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
   sectionTitle: {
     fontSize: Typography.base,
     fontWeight: Typography.bold,
     color: Colors.primary,
-    marginBottom: Spacing.md,
+  },
+  editBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  editBtnText: {
+    fontSize: Typography.xs,
+    fontWeight: Typography.semiBold,
+    color: Colors.primary,
   },
   subLabel: {
     fontSize: Typography.xs,
@@ -382,5 +546,115 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     color: Colors.textSecondary,
     lineHeight: Typography.sm * 1.65,
+  },
+  // ── Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxxl,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: 'center',
+    marginBottom: Spacing.base,
+  },
+  modalTitle: {
+    fontSize: Typography.xl,
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: Typography.sm,
+    color: Colors.textMuted,
+    marginBottom: Spacing.xl,
+  },
+  fieldLabel: {
+    fontSize: Typography.xs,
+    fontWeight: Typography.semiBold,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginBottom: Spacing.sm,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 12,
+    fontSize: Typography.base,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
+    marginBottom: Spacing.base,
+  },
+  sexRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  sexOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  sexOptionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryUltraLight,
+  },
+  sexOptionText: {
+    fontSize: Typography.sm,
+    fontWeight: Typography.medium,
+    color: Colors.textMuted,
+  },
+  sexOptionTextActive: {
+    color: Colors.primary,
+    fontWeight: Typography.semiBold,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  cancelModalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  cancelModalText: {
+    fontSize: Typography.base,
+    fontWeight: Typography.medium,
+    color: Colors.textMuted,
+  },
+  saveBtn: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
+  saveBtnText: {
+    fontSize: Typography.base,
+    fontWeight: Typography.semiBold,
+    color: Colors.white,
   },
 });

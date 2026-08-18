@@ -89,7 +89,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.rowFields}>
           <View style={[styles.fieldGroup, { flex: 1, marginRight: Spacing.md }]}>
             <View style={styles.labelRow}>
-              <Text style={styles.labelIcon}>#</Text>
+            
               <Text style={styles.fieldLabel}>Patient ID</Text>
             </View>
             <View style={styles.idField}>
@@ -99,7 +99,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
 
           <View style={[styles.fieldGroup, { flex: 1 }]}>
             <View style={styles.labelRow}>
-              <Text style={styles.labelIcon}>A</Text>
+            
               <Text style={styles.fieldLabel}>Age</Text>
             </View>
             <TextInput
@@ -118,7 +118,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         {/* Full Name */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-            <Text style={styles.labelIcon}>P</Text>
+  
             <Text style={styles.fieldLabel}>Full Name</Text>
           </View>
           <TextInput
@@ -135,7 +135,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         {/* Sex — dropdown style */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-            <Text style={styles.labelIcon}>S</Text>
+        
             <Text style={styles.fieldLabel}>Sex</Text>
           </View>
           <View style={styles.sexDropdown}>
@@ -157,7 +157,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         {/* Lesion Location */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-            <Text style={styles.labelIcon}>L</Text>
+           
             <Text style={styles.fieldLabel}>Lesion Location</Text>
           </View>
           <View style={styles.chipRow}>

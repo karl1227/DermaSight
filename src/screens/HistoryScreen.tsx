@@ -8,13 +8,15 @@ import {
   StatusBar,
   RefreshControl,
   ListRenderItem,
+  Alert,
 } from 'react-native';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, ScreeningRecord, ScreeningStatus, TabParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
-import { getAllScreenings } from '../database/database';
+import { getAllScreenings, deleteScreening } from '../database/database';
+import { deleteLocalImage } from '../services/imageStorageService';
 import { formatDate, formatConfidence, getStatusColor } from '../utils';
 
 type Props = {
@@ -50,10 +52,33 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const handleLongPress = (item: ScreeningRecord) => {
+    Alert.alert(
+      'Delete Record',
+      `Are you sure you want to delete this record?\n\n"${item.full_name} — ${item.predicted_lesion_type}"`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Okay',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteLocalImage(item.image_path);
+            await deleteScreening(item.id!);
+            await loadRecords();
+          },
+        },
+      ],
+    );
+  };
+
   const renderItem: ListRenderItem<ScreeningRecord> = ({ item }) => {
     const statusColor = getStatusColor(item.screening_status as ScreeningStatus);
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        onLongPress={() => handleLongPress(item)}
+        delayLongPress={400}
+        activeOpacity={0.95}>
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.lesionType}>{item.predicted_lesion_type}</Text>
@@ -91,7 +116,7 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           activeOpacity={0.8}>
           <Text style={styles.viewBtnText}>View Report →</Text>
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 

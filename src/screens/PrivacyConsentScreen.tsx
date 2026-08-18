@@ -19,43 +19,28 @@ type Props = {
 interface Section {
   title: string;
   icon: 'db' | 'wifi' | 'x';
-  items: string[];
-  preamble?: string;
+  body: string;
+  citation: string;
 }
 
 const SECTIONS: Section[] = [
   {
     icon: 'db',
-    title: 'Local Data Storage',
-    preamble: 'All screening information is stored locally on your device, including:',
-    items: [
-      'Personal information (age, gender)',
-      'Lesion location and selected symptoms',
-      'Captured images',
-      'Screening results and history',
-    ],
+    title: 'On-Device Storage',
+    body: 'Profiles, logs, and captured images are stored purely in local SQLite storage.',
+    citation: 'ISO/IEC 25010',
   },
   {
     icon: 'wifi',
     title: 'Offline Processing',
-    preamble: 'DermaSight processes all data locally on your smartphone:',
-    items: [
-      'No internet connection required',
-      'Data does not leave your device',
-      'CNN processing using TensorFlow Lite',
-      'Complete privacy and data control',
-    ],
+    body: 'TensorFlow Lite executes CNN inferences locally on-device with zero internet reliance.',
+    citation: 'ISO/IEC 25010',
   },
   {
     icon: 'x',
-    title: 'What We Don\'t Do',
-    preamble: 'DermaSight is designed with your privacy in mind:',
-    items: [
-      'No data uploads to external servers',
-      'No third-party data sharing',
-      'No advertising or tracking',
-      'No cloud storage',
-    ],
+    title: 'Zero Server Uploads',
+    body: 'No cloud backups, third-party tracking, or external server data transfers occur.',
+    citation: 'RA 10173 Data Privacy Act',
   },
 ];
 
@@ -144,15 +129,11 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
                 <Text style={styles.cardTitle}>{section.title}</Text>
               </View>
-              {section.preamble ? (
-                <Text style={styles.cardPreamble}>{section.preamble}</Text>
-              ) : null}
-              {section.items.map((item, idx) => (
-                <View key={idx} style={styles.bulletRow}>
-                  <View style={styles.bulletDot} />
-                  <Text style={styles.bulletText}>{item}</Text>
-                </View>
-              ))}
+              <View style={styles.bulletRow}>
+                <View style={styles.bulletDot} />
+                <Text style={styles.bulletText}>{section.body}</Text>
+              </View>
+              <Text style={styles.citation}>{section.citation}</Text>
             </View>
           );
         })}
@@ -353,6 +334,12 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     flex: 1,
     lineHeight: 20,
+  },
+  citation: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: '#666666',
+    marginTop: Spacing.xs,
   },
   buttonGroup: {
     marginTop: Spacing.base,
