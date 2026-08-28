@@ -1,55 +1,42 @@
 /**
  * Image Preprocessing Service
  *
- * Simulates the preprocessing pipeline for UI feedback.
- * In production, each step would apply actual image transforms
- * (resize to 224×224, normalize pixel values, apply Gaussian blur, etc.)
- * before feeding the tensor to the TFLite EfficientNet model.
+ * Prepares a captured image for EfficientNet inference.
  */
+
+import { loadResizedImageRgb, type ImageSource } from './imageProcessingService';
 
 export interface PreprocessingStep {
   id: string;
   label: string;
   description: string;
-  durationMs: number;
 }
 
 export const PREPROCESSING_STEPS: PreprocessingStep[] = [
   {
+    id: 'decode',
+    label: 'Image Decode',
+    description: 'Decoding captured JPEG pixels',
+  },
+  {
     id: 'resize',
-    label: 'Image Resizing',
-    description: 'Resizing image to 224×224px for CNN input',
-    durationMs: 400,
+    label: 'Image Resize',
+    description: 'Resizing image to 224x224 pixels',
   },
   {
-    id: 'normalize',
-    label: 'Image Normalization',
-    description: 'Normalizing pixel values to [0, 1] range',
-    durationMs: 350,
-  },
-  {
-    id: 'noise',
-    label: 'Noise Reduction',
-    description: 'Applying Gaussian blur to reduce image noise',
-    durationMs: 500,
-  },
-  {
-    id: 'detection',
-    label: 'Lesion Area Detection',
-    description: 'Identifying and isolating lesion region of interest',
-    durationMs: 600,
-  },
-  {
-    id: 'enhancement',
-    label: 'Image Enhancement',
-    description: 'Enhancing contrast and sharpness for feature extraction',
-    durationMs: 450,
+    id: 'rgb',
+    label: 'RGB Conversion',
+    description: 'Converting pixels to RGB channel order',
   },
   {
     id: 'tensor',
-    label: 'Feature Extraction Preparation',
-    description: 'Converting image to input tensor for EfficientNet',
-    durationMs: 300,
+    label: 'Tensor Build',
+    description: 'Building Float32 tensor for EfficientNet',
+  },
+  {
+    id: 'validate',
+    label: 'Tensor Validation',
+    description: 'Validating shape [1, 224, 224, 3]',
   },
 ];
 
@@ -64,34 +51,88 @@ export interface PreprocessingImageSource {
   filePath?: string;
 }
 
+export interface PreprocessingResult {
+  id: string;
+  processedImagePath: string;
+  inputTensor: ArrayBuffer;
+  width: 224;
+  height: 224;
+  channels: 3;
+  inputRange: '0-255';
+}
+
+const MODEL_INPUT_SIZE = 224;
+const MODEL_INPUT_CHANNELS = 3;
+const MODEL_INPUT_ELEMENTS = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE * MODEL_INPUT_CHANNELS;
+
+const preprocessingCache = new Map<string, PreprocessingResult>();
+
+function createPreprocessingId(): string {
+  return `preprocessed-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function markStep(
+  onStepUpdate: StepProgressCallback,
+  stepId: string,
+  completed: boolean,
+): void {
+  onStepUpdate(stepId, completed);
+}
+
+export function getPreprocessedResult(id?: string): PreprocessingResult | undefined {
+  return id ? preprocessingCache.get(id) : undefined;
+}
+
 /**
  * Run the preprocessing pipeline with step-by-step progress updates.
- * Returns the processed image path (original path for now — in production,
- * this would be the path to the processed/resized image file).
  *
- * @param imagePath - Local path of the captured/selected image
+ * @param imageSource - Captured/selected image source
  * @param onStepUpdate - Callback fired when each step starts and completes
  */
 export async function runPreprocessing(
   imageSource: string | PreprocessingImageSource,
   onStepUpdate: StepProgressCallback,
-): Promise<string> {
-  for (const step of PREPROCESSING_STEPS) {
-    // Signal step started (not yet completed)
-    onStepUpdate(step.id, false);
+): Promise<PreprocessingResult> {
+  const source: ImageSource =
+    typeof imageSource === 'string'
+      ? { filePath: imageSource }
+      : imageSource;
 
-    // Simulate processing time
-    await new Promise<void>(resolve => setTimeout(resolve, step.durationMs));
+  markStep(onStepUpdate, 'decode', false);
+  markStep(onStepUpdate, 'decode', true);
 
-    // Signal step completed
-    onStepUpdate(step.id, true);
+  markStep(onStepUpdate, 'resize', false);
+  const resizedRGB = await loadResizedImageRgb(source, MODEL_INPUT_SIZE);
+  markStep(onStepUpdate, 'resize', true);
+
+  markStep(onStepUpdate, 'rgb', false);
+  markStep(onStepUpdate, 'rgb', true);
+
+  markStep(onStepUpdate, 'tensor', false);
+  const inputBuffer = new ArrayBuffer(MODEL_INPUT_ELEMENTS * 4);
+  const inputFloat32 = new Float32Array(inputBuffer);
+
+  for (let i = 0; i < MODEL_INPUT_ELEMENTS; i++) {
+    inputFloat32[i] = resizedRGB[i];
   }
+  markStep(onStepUpdate, 'tensor', true);
 
-  // In production: return path to the resized/processed image
-  // For now: return the original path unchanged
-  if (typeof imageSource === 'string') {
-    return imageSource;
+  markStep(onStepUpdate, 'validate', false);
+  if (inputFloat32.length !== MODEL_INPUT_ELEMENTS) {
+    throw new Error(`Unexpected tensor size: ${inputFloat32.length}`);
   }
+  markStep(onStepUpdate, 'validate', true);
 
-  return imageSource.filePath ?? '';
+  const result: PreprocessingResult = {
+    id: createPreprocessingId(),
+    processedImagePath: source.filePath ?? '',
+    inputTensor: inputBuffer,
+    width: MODEL_INPUT_SIZE,
+    height: MODEL_INPUT_SIZE,
+    channels: MODEL_INPUT_CHANNELS,
+    inputRange: '0-255',
+  };
+
+  preprocessingCache.set(result.id, result);
+  return result;
 }

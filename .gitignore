@@ -27,6 +27,7 @@ DerivedData
 build/
 .idea
 .gradle
+.gradle-home/
 local.properties
 *.iml
 *.hprof
@@ -34,6 +35,13 @@ local.properties
 *.keystore
 !debug.keystore
 .kotlin/
+
+# Android build outputs
+android/.gradle/
+android/.gradle-home/
+android/app/build/
+android/build/
+android/.cxx/
 
 # node.js
 #

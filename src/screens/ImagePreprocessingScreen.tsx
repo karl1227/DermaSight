@@ -46,12 +46,16 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
     ),
   );
   const [processedUri, setProcessedUri] = useState<string | null>(null);
+  const [preprocessingId, setPreprocessingId] = useState<string | undefined>();
   const [isRunning, setIsRunning] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   /** Start preprocessing when the screen mounts */
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setIsRunning(true);
+    setError(null);
     runPreprocessing(
       {
         base64: imageData,
@@ -59,31 +63,51 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
         filePath: sourceImagePath,
       },
       (stepId, completed) => {
-      setStepStates(prev => ({
-        ...prev,
-        [stepId]: { started: true, completed },
-      }));
+        setStepStates(prev => ({
+          ...prev,
+          [stepId]: { started: true, completed },
+        }));
       },
     )
       .then(result => {
-        setProcessedUri(result);
+        setProcessedUri(result.processedImagePath);
+        setPreprocessingId(result.id);
         setIsRunning(false);
         setIsDone(true);
+        // Auto-navigate to classification swiftly after a brief visual confirmation
+        timer = setTimeout(() => {
+          navigation.replace('AIClassification', {
+            patientInfo,
+            symptoms,
+            imageUri: result.processedImagePath ?? imageUri,
+            imagePath: sourceImagePath,
+            imageData,
+            imageType,
+            preprocessingId: result.id,
+          });
+        }, 600);
       })
-      .catch(() => {
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Unknown preprocessing error';
+        setError(`Preprocessing failed: ${message}`);
         setIsRunning(false);
       });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceImagePath, imageUri]);
 
   const handleContinue = () => {
-    navigation.navigate('AIClassification', {
+    navigation.replace('AIClassification', {
       patientInfo,
       symptoms,
       imageUri: processedUri ?? imageUri,
       imagePath: sourceImagePath,
       imageData,
       imageType,
+      preprocessingId,
     });
   };
 
@@ -176,14 +200,20 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
           <View style={styles.doneCard}>
             <Text style={styles.doneCardTitle}>Ready for CNN Analysis</Text>
             <Text style={styles.doneCardText}>
-              Image has been preprocessed and is ready to be fed into
-              the EfficientNet model for classification.
+              Image tensor has been prepared as Float32 RGB data with shape
+              [1, 224, 224, 3] for EfficientNet classification.
             </Text>
           </View>
         )}
 
+        {error && (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         <AppButton
-          label="Continue to AI Classification →"
+          label="Continue to AI Classification"
           onPress={handleContinue}
           size="lg"
           disabled={!isDone}
@@ -321,6 +351,20 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: Typography.sm * 1.6,
+  },
+  errorCard: {
+    backgroundColor: Colors.dangerLight,
+    borderRadius: Radius.md,
+    padding: Spacing.base,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
+  errorText: {
+    fontSize: Typography.sm,
+    color: Colors.danger,
+    textAlign: 'center',
+    lineHeight: Typography.sm * 1.45,
   },
   continueBtn: {},
 });

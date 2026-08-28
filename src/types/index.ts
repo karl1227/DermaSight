@@ -129,6 +129,7 @@ export type RootStackParamList = {
     imagePath?: string;
     imageData?: string;
     imageType?: string;
+    preprocessingId?: string;
   };
   Result: {
     patientInfo: PatientInfo;

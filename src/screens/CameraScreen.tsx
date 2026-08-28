@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,13 @@ import {
   ScrollView,
   PermissionsAndroid,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
-import { launchCamera, launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
+import { RouteProp, useIsFocused } from '@react-navigation/native';
+import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
+import RNFS from 'react-native-fs';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
@@ -26,59 +29,80 @@ type Props = {
 const STEPS = ['Information', 'Symptoms', 'Scan'];
 
 const TIPS = [
-  'Center the lesion in the frame',
-  'Use bright, natural light',
-  'Keep phone steady — avoid blur',
-  'Capture only the affected skin area',
+  'Center the lesion inside the guide',
+  'Use bright, even lighting',
+  'Hold steady to avoid blur',
+  'Keep only the affected skin area in view',
 ];
 
 export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const { patientInfo, symptoms } = route.params;
   const [loading, setLoading] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
+  const cameraRef = useRef<Camera>(null);
+  const device = useCameraDevice('back');
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    const status = Camera.getCameraPermissionStatus();
+    setHasPermission(status === 'granted');
+  }, []);
+
+  const navigateToConfirm = (image: {
+    uri: string;
+    path?: string;
+    base64?: string;
+    type?: string;
+    width?: number;
+    height?: number;
+    fileSize?: number;
+  }) => {
+    navigation.navigate('ConfirmImage', {
+      patientInfo,
+      symptoms,
+      imageUri: image.uri,
+      imagePath: image.path ?? image.uri,
+      imageData: image.base64,
+      imageType: image.type ?? 'image/jpeg',
+      imageMeta: {
+        width: image.width,
+        height: image.height,
+        fileSize: image.fileSize,
+      },
+    });
+  };
 
   const handleImageResult = (response: ImagePickerResponse) => {
     setLoading(false);
     if (response.didCancel) return;
     if (response.errorCode) {
-      Alert.alert('Error', response.errorMessage ?? 'Could not access camera or gallery.');
+      Alert.alert('Error', response.errorMessage ?? 'Could not access gallery.');
       return;
     }
     const asset = response.assets?.[0];
     if (!asset?.uri) {
-      Alert.alert('Error', 'No image was captured. Please try again.');
+      Alert.alert('Error', 'No image was selected. Please try again.');
       return;
     }
-    navigation.navigate('ConfirmImage', {
-      patientInfo,
-      symptoms,
-      imageUri: asset.uri,
-      imagePath: asset.originalPath ?? asset.uri,
-      imageData: asset.base64,
-      imageType: asset.type,
-      imageMeta: {
-        width: asset.width,
-        height: asset.height,
-        fileSize: asset.fileSize,
-      },
+    navigateToConfirm({
+      uri: asset.uri,
+      path: asset.originalPath ?? asset.uri,
+      base64: asset.base64,
+      type: asset.type,
+      width: asset.width,
+      height: asset.height,
+      fileSize: asset.fileSize,
     });
   };
 
   const requestCameraPermission = async (): Promise<boolean> => {
-    if (Platform.OS !== 'android') return true;
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-        {
-          title: 'Camera Permission',
-          message: 'SkinSense needs camera access to capture skin lesion images.',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Deny',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } catch {
-      return false;
+    const status = await Camera.requestCameraPermission();
+    const granted = status === 'granted';
+    setHasPermission(granted);
+    if (!granted) {
+      Alert.alert('Permission Denied', 'Enable camera access in Settings to use guided capture.');
     }
+    return granted;
   };
 
   const requestGalleryPermission = async (): Promise<boolean> => {
@@ -101,24 +125,56 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleCapture = async () => {
-    const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Enable camera access in Settings to use this feature.');
+      const granted = await requestCameraPermission();
+      if (!granted) return;
+    }
+
+    if (!cameraRef.current) {
+      Alert.alert('Camera Not Ready', 'Please wait for the camera preview to load.');
       return;
     }
-    setLoading(true);
-    launchCamera({ mediaType: 'photo', quality: 0.9, saveToPhotos: false, cameraType: 'back', includeBase64: true, includeExtra: true }, handleImageResult);
+
+    try {
+      setLoading(true);
+      const photo = await cameraRef.current.takePhoto({
+        flash: 'off',
+        enableShutterSound: true,
+      });
+      const base64 = await RNFS.readFile(photo.path, 'base64');
+      navigateToConfirm({
+        uri: `file://${photo.path}`,
+        path: photo.path,
+        base64,
+        type: 'image/jpeg',
+        width: photo.width,
+        height: photo.height,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not capture image.';
+      Alert.alert('Capture Failed', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGallery = async () => {
-    const hasPermission = await requestGalleryPermission();
-    if (!hasPermission) {
+    const granted = await requestGalleryPermission();
+    if (!granted) {
       Alert.alert('Permission Denied', 'Enable photo library access in Settings to use this feature.');
       return;
     }
     setLoading(true);
-    launchImageLibrary({ mediaType: 'photo', quality: 0.9, selectionLimit: 1, includeBase64: true, includeExtra: true }, handleImageResult);
+    launchImageLibrary(
+      { mediaType: 'photo', quality: 0.9, selectionLimit: 1, includeBase64: true, includeExtra: true },
+      handleImageResult,
+    );
   };
+
+  const [torchOn, setTorchOn] = useState(false);
+
+  const canShowCamera = hasPermission && device;
+  const supportsTorch = Boolean(device?.hasTorch);
 
   return (
     <View style={styles.container}>
@@ -126,63 +182,102 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>← Back</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Image Capture</Text>
-          <View style={{ width: 40 }} />
+          <Text style={styles.headerTitle}>Guided Image Capture</Text>
+          {supportsTorch ? (
+            <TouchableOpacity
+              onPress={() => setTorchOn(prev => !prev)}
+              style={[styles.torchBtn, torchOn && styles.torchBtnActive]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={[styles.torchText, torchOn && styles.torchTextActive]}>
+                {torchOn ? '💡 Light ON' : '🔦 Light'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
         <ProgressSteps steps={STEPS} currentStep={2} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
+        {/* Lighting guidance badge */}
+        <View style={styles.lightingGuideBanner}>
+          <Text style={styles.lightingGuideIcon}>💡</Text>
+          <Text style={styles.lightingGuideText}>
+            Ensure even, bright light with no harsh shadows or direct glare.
+          </Text>
+        </View>
 
-        {/* Scan frame */}
-        <View style={styles.scanArea}>
-          <View style={styles.scanFrame}>
-            <View style={[styles.corner, styles.cornerTL]} />
-            <View style={[styles.corner, styles.cornerTR]} />
-            <View style={[styles.corner, styles.cornerBL]} />
-            <View style={[styles.corner, styles.cornerBR]} />
-            <View style={styles.scanCenter}>
-              <Text style={styles.scanLabel}>Scan Area</Text>
-              <Text style={styles.scanHint}>Position lesion within the frame</Text>
+        <View style={styles.cameraShell}>
+          {canShowCamera ? (
+            <Camera
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={isFocused}
+              torch={torchOn ? 'on' : 'off'}
+              photo
+            />
+          ) : (
+            <View style={styles.cameraFallback}>
+              {!device ? (
+                <>
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                  <Text style={styles.fallbackText}>Loading back camera...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.fallbackTitle}>Camera permission needed</Text>
+                  <Text style={styles.fallbackText}>
+                    Allow camera access to use live guided capture.
+                  </Text>
+                  <AppButton label="Allow Camera" onPress={requestCameraPermission} size="md" />
+                </>
+              )}
+            </View>
+          )}
+
+          <View pointerEvents="none" style={styles.guidanceOverlay}>
+            <View style={styles.scanFrame}>
+              <View style={[styles.corner, styles.cornerTL]} />
+              <View style={[styles.corner, styles.cornerTR]} />
+              <View style={[styles.corner, styles.cornerBL]} />
+              <View style={[styles.corner, styles.cornerBR]} />
+              <View style={styles.centerDot} />
+            </View>
+
+            <View style={styles.bottomGuide}>
+              <Text style={styles.guideText}>Place lesion inside frame & hold steady</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.captureHint}>
-          Tap Capture Image to open the phone camera in the system app.
-        </Text>
-
-        {/* Patient strip */}
         <View style={styles.patientStrip}>
-          <Text style={styles.patientStripText}>
-            {patientInfo.fullName} · {patientInfo.age}y · {patientInfo.sex} · {patientInfo.lesionLocation}
+          <Text style={styles.patientStripText} numberOfLines={1}>
+            {patientInfo.fullName} • {patientInfo.age}y • {patientInfo.sex} • {patientInfo.lesionLocation}
           </Text>
         </View>
 
-        {/* Tips */}
-        <View style={styles.tipsCard}>
-          <Text style={styles.tipsTitle}>Capture Tips</Text>
-          {TIPS.map(tip => (
-            <View key={tip} style={styles.tipRow}>
-              <View style={styles.tipBullet} />
-              <Text style={styles.tipText}>{tip}</Text>
-            </View>
-          ))}
+        <View style={styles.actionsContainer}>
+          <AppButton
+            label="Capture Guided Image"
+            onPress={handleCapture}
+            size="lg"
+            loading={loading}
+            style={styles.captureBtn}
+          />
+          <AppButton
+            label="Upload from Gallery"
+            onPress={handleGallery}
+            variant="outline"
+            size="md"
+            loading={loading}
+          />
         </View>
-
-        <AppButton label="Capture Image" onPress={handleCapture} size="lg" loading={loading} style={styles.captureBtn} />
-        <AppButton label="Upload from Gallery" onPress={handleGallery} variant="outline" size="lg" loading={loading} />
-
-        <Text style={styles.footNote}>
-          Image quality directly affects classification accuracy. Use a clear, well-lit photo.
-        </Text>
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -192,72 +287,156 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.primary,
     paddingTop: Spacing.xxxl,
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  backText: { fontSize: Typography.base, color: 'rgba(255,255,255,0.85)', fontWeight: Typography.medium },
+  backText: { fontSize: Typography.base, color: 'rgba(255,255,255,0.9)', fontWeight: Typography.medium },
   headerTitle: { fontSize: Typography.lg, fontWeight: Typography.bold, color: Colors.white },
-  scroll: { flex: 1 },
-  scrollContent: { padding: Spacing.xl, paddingBottom: Spacing.xxxl },
-  scanArea: { alignItems: 'center', marginBottom: Spacing.base },
-  scanFrame: {
-    width: 220,
-    height: 220,
-    backgroundColor: Colors.primaryDark,
+  headerSpacer: { width: 40 },
+  torchBtn: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  torchBtnActive: {
+    backgroundColor: Colors.accent,
+  },
+  torchText: {
+    fontSize: Typography.xs,
+    fontWeight: Typography.bold,
+    color: Colors.white,
+  },
+  torchTextActive: {
+    color: Colors.primaryDark,
+  },
+  lightingGuideBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+    marginBottom: Spacing.xs,
+  },
+  lightingGuideIcon: {
+    fontSize: Typography.xs,
+    marginRight: Spacing.xs,
+  },
+  lightingGuideText: {
+    fontSize: Typography.xs,
+    color: '#92400E',
+    fontWeight: Typography.medium,
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    justifyContent: 'space-between',
+  },
+  cameraShell: {
+    flex: 1,
+    minHeight: 280,
     borderRadius: Radius.xl,
+    overflow: 'hidden',
+    backgroundColor: Colors.primaryDark,
+    marginBottom: Spacing.sm,
+    position: 'relative',
+    ...Shadow.md,
+  },
+  cameraFallback: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
   },
-  corner: { position: 'absolute', width: 24, height: 24, borderColor: Colors.accent, borderWidth: 2.5 },
-  cornerTL: { top: 12, left: 12, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 5 },
-  cornerTR: { top: 12, right: 12, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 5 },
-  cornerBL: { bottom: 12, left: 12, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 5 },
-  cornerBR: { bottom: 12, right: 12, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 5 },
-  scanCenter: { alignItems: 'center' },
-  scanLabel: { fontSize: Typography.base, fontWeight: Typography.semiBold, color: Colors.accent },
-  scanHint: { fontSize: Typography.xs, color: 'rgba(255,255,255,0.55)', marginTop: 4, textAlign: 'center' },
-  captureHint: {
-    fontSize: Typography.xs,
+  fallbackTitle: {
+    fontSize: Typography.base,
+    fontWeight: Typography.bold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  fallbackText: {
+    fontSize: Typography.sm,
     color: Colors.textMuted,
     textAlign: 'center',
     marginBottom: Spacing.base,
+    lineHeight: Typography.sm * 1.4,
+  },
+  guidanceOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.base,
+  },
+  scanFrame: {
+    width: 220,
+    height: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: Spacing.md,
+  },
+  corner: { position: 'absolute', width: 32, height: 32, borderColor: Colors.accent, borderWidth: 3 },
+  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 6 },
+  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 6 },
+  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 6 },
+  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 6 },
+  centerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.accent,
+  },
+  bottomGuide: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.xs,
+  },
+  guideText: {
+    fontSize: Typography.xs,
+    color: Colors.white,
+    fontWeight: Typography.medium,
+    textAlign: 'center',
   },
   patientStrip: {
     backgroundColor: Colors.primaryUltraLight,
     borderRadius: Radius.md,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.base,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.primaryLight,
   },
-  patientStripText: { fontSize: Typography.xs, color: Colors.primary, fontWeight: Typography.semiBold, textAlign: 'center' },
-  tipsCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    marginBottom: Spacing.xl,
-    ...Shadow.card,
-  },
-  tipsTitle: { fontSize: Typography.base, fontWeight: Typography.bold, color: Colors.textPrimary, marginBottom: Spacing.md },
-  tipRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
-  tipBullet: { width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.primary, marginRight: Spacing.md },
-  tipText: { fontSize: Typography.sm, color: Colors.textSecondary, flex: 1 },
-  captureBtn: { marginBottom: Spacing.md },
-  footNote: {
+  patientStripText: {
     fontSize: Typography.xs,
-    color: Colors.textMuted,
+    color: Colors.primary,
+    fontWeight: Typography.semiBold,
     textAlign: 'center',
-    marginTop: Spacing.base,
-    lineHeight: Typography.xs * 1.6,
+  },
+  actionsContainer: {
+    width: '100%',
+  },
+  captureBtn: {
+    marginBottom: Spacing.sm,
   },
 });

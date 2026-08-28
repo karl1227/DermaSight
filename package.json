@@ -5,6 +5,7 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
+    "postinstall": "node scripts/patch-react-native-screens.js",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"
@@ -30,7 +31,8 @@
     "react-native-nitro-modules": "^0.36.5",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.25.2",
-    "react-native-svg": "^15.15.5"
+    "react-native-svg": "^15.15.5",
+    "react-native-vision-camera": "^4.7.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

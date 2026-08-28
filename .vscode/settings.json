@@ -1,3 +1,7 @@
 {
-    "typescript.autoClosingTags": false
+    "typescript.autoClosingTags": false,
+    "java.import.gradle.enabled": false,
+    "java.configuration.updateBuildConfiguration": "disabled",
+    "gradle.nestedProjects": false,
+    "gradle.autoDetect": "off"
 }

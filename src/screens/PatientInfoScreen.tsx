@@ -42,7 +42,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
     }
     const ageNum = parseInt(age, 10);
     if (!age || isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
-      Alert.alert('Required', 'Please enter a valid age (1–120).');
+      Alert.alert('Required', 'Please enter a valid age (1-120).');
       return;
     }
     if (!sex) {
@@ -62,10 +62,9 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
 
-      {/* Minimal header */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
       </View>
 
@@ -74,18 +73,15 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-
         <Text style={styles.pageTitle}>Basic Screening Information</Text>
         <Text style={styles.pageSubtitle}>
           This information helps improve the context of the preliminary screening
         </Text>
 
-        {/* Progress */}
         <View style={styles.progressWrapper}>
           <ProgressSteps steps={STEPS} currentStep={0} />
         </View>
 
-        {/* Patient ID + Age row */}
         <View style={styles.rowFields}>
           <View style={[styles.fieldGroup, { flex: 1, marginRight: Spacing.md }]}>
             <View style={styles.labelRow}>
@@ -115,7 +111,6 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Full Name */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
   
@@ -132,7 +127,6 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
           />
         </View>
 
-        {/* Sex — dropdown style */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
         
@@ -154,7 +148,6 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Lesion Location */}
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
            
@@ -179,7 +172,6 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Note */}
         <View style={styles.noteCard}>
           <Text style={styles.noteText}>
             This information helps the AI model provide more accurate preliminary
@@ -188,10 +180,9 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Sticky bottom button */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.continueBtn} onPress={handleContinue} activeOpacity={0.85}>
-          <Text style={styles.continueBtnText}>Continue →</Text>
+          <Text style={styles.continueBtnText}>Continue</Text>
         </TouchableOpacity>
       </View>
     </View>

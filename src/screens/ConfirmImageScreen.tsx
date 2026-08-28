@@ -66,7 +66,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
     return () => {
       isMounted = false;
     };
-  }, [imageMeta, imageUri]);
+  }, [imageData, imageMeta, imagePath, imageType, imageUri]);
 
   return (
     <View style={styles.container}>

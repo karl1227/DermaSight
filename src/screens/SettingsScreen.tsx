@@ -63,7 +63,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={[styles.rowLabel, color ? { color } : null]}>{label}</Text>
         {sublabel ? <Text style={styles.rowSublabel}>{sublabel}</Text> : null}
       </View>
-      {right ?? <Text style={styles.chevron}>›</Text>}
+      {right ?? <Text style={styles.chevron}>{'>'}</Text>}
     </TouchableOpacity>
   );
 
@@ -73,7 +73,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>‹ Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
@@ -82,8 +82,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-
-        {/* Screening History */}
         <Text style={styles.groupLabel}>Screening History</Text>
         <View style={styles.group}>
           <SettingRow
@@ -109,7 +107,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           />
         </View>
 
-        {/* Privacy & Legal */}
         <Text style={styles.groupLabel}>Privacy & Legal</Text>
         <View style={styles.group}>
           <SettingRow
@@ -123,45 +120,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             label="View Medical Disclaimer"
             onPress={() => navigation.navigate('MedicalDisclaimer')}
           />
-        </View>
-
-        {/* About */}
-        <Text style={styles.groupLabel}>About</Text>
-        <View style={styles.group}>
-          <SettingRow
-            icon="A"
-            label="Application"
-            sublabel="SkinSense v1.0.0"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="R"
-            label="Research Purpose"
-            sublabel="Capstone thesis prototype — educational use only"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="AI"
-            label="AI Model"
-            sublabel="CNN EfficientNet · HAM10000 · TensorFlow Lite"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="S"
-            label="Storage"
-            sublabel="SQLite (local) · Local file system"
-            onPress={() => {}}
-          />
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            SkinSense is a capstone thesis prototype for educational
-            pigmented skin lesion screening. It is not a licensed medical device.
-          </Text>
         </View>
       </ScrollView>
     </View>
@@ -244,19 +202,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.borderLight,
     marginLeft: 56 + Spacing.base,
-  },
-  footer: {
-    marginTop: Spacing.xl,
-    backgroundColor: Colors.primaryUltraLight,
-    borderRadius: Radius.md,
-    padding: Spacing.base,
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-  },
-  footerText: {
-    fontSize: Typography.xs,
-    color: Colors.primary,
-    textAlign: 'center',
-    lineHeight: Typography.xs * 1.65,
   },
 });

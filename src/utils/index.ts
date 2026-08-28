@@ -62,7 +62,7 @@ export function getStatusColor(status: ScreeningStatus): string {
  */
 export function getAssessmentMessage(
   status: ScreeningStatus,
-  lesionType: LesionClass,
+  _lesionType: LesionClass,
 ): string {
   switch (status) {
     case 'High Concern':

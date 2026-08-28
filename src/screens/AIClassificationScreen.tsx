@@ -34,7 +34,7 @@ const INFERENCE_STEPS = [
   { id: 's1', label: 'Loading preprocessed image tensor' },
   { id: 's2', label: 'Running CNN EfficientNet inference' },
   { id: 's3', label: 'Comparing features with 7 HAM10000 classes' },
-  { id: 's4', label: 'Applying symptom checklist context' },
+  { id: 's4', label: 'Reading trained model probabilities' },
   { id: 's5', label: 'Evaluating confidence threshold' },
   { id: 's6', label: 'Generating preliminary screening result' },
 ];
@@ -43,20 +43,18 @@ export const AIClassificationScreen: React.FC<Props> = ({
   navigation,
   route,
 }) => {
-  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType } = route.params;
+  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType, preprocessingId } = route.params;
   const sourceImagePath = imagePath ?? imageUri;
 
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [activeClass, setActiveClass] = useState<number>(-1);
-  const [isDone, setIsDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
-  // Spinner animation
   useEffect(() => {
     Animated.loop(
       Animated.timing(rotateAnim, {
@@ -70,11 +68,9 @@ export const AIClassificationScreen: React.FC<Props> = ({
   useEffect(() => {
     const runClassification = async () => {
       try {
-        // Simulate step-by-step progress
-        const stepDelay = 500;
+        const stepDelay = 200;
         for (let i = 0; i < INFERENCE_STEPS.length; i++) {
           setCurrentStep(i);
-          // Cycle through class chips while processing
           setActiveClass(i % LESION_CLASSES.length);
           await new Promise<void>(r => setTimeout(r, stepDelay));
 
@@ -89,7 +85,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
           setCompletedSteps(prev => [...prev, INFERENCE_STEPS[i].id]);
         }
 
-        // Run actual mock inference
         const result = await runInference(
           {
             base64: imageData,
@@ -97,6 +92,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
             filePath: sourceImagePath,
           },
           symptoms,
+          preprocessingId,
         );
 
         navigation.replace('Result', {
@@ -108,7 +104,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown runtime error';
         setError(`Classification failed: ${message}`);
-        setIsDone(true);
       }
     };
 
@@ -128,7 +123,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
       <View style={styles.header}>
         <Text style={styles.headerTitle}>CNN EfficientNet Classification</Text>
         <Text style={styles.headerSubtitle}>
-          TensorFlow Lite · Local Processing · HAM10000
+          Using the trained TensorFlow Lite model
         </Text>
       </View>
 
@@ -136,8 +131,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-
-        {/* Circular progress */}
         <View style={styles.progressCenter}>
           <View style={styles.progressCircleOuter}>
             <Animated.View
@@ -154,7 +147,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
           </View>
         </View>
 
-        {/* Class chips */}
         <View style={styles.chipsSection}>
           <Text style={styles.chipsTitle}>HAM10000 Classes</Text>
           <View style={styles.chipsRow}>
@@ -178,7 +170,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
           </View>
         </View>
 
-        {/* Step cards */}
         <View style={styles.stepsCard}>
           {INFERENCE_STEPS.map((step, idx) => {
             const isCompleted = completedSteps.includes(step.id);
@@ -193,7 +184,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
                   idx === INFERENCE_STEPS.length - 1 && styles.stepLast,
                 ]}>
                 <Text style={styles.stepIcon}>
-              {isCompleted ? '✓' : isActive ? '•' : '○'}
+                  {isCompleted ? 'OK' : isActive ? '>' : 'o'}
                 </Text>
                 <Text
                   style={[
@@ -211,7 +202,14 @@ export const AIClassificationScreen: React.FC<Props> = ({
           })}
         </View>
 
-        {/* Error state */}
+        <View style={styles.modelCard}>
+          <Text style={styles.modelCardTitle}>Available CNN Model</Text>
+          <Text style={styles.modelCardText}>
+            EfficientNet TensorFlow Lite model trained for the supported
+            HAM10000 lesion classes.
+          </Text>
+        </View>
+
         {error && (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
@@ -224,7 +222,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.errorBtn, styles.errorBtnPrimary]}
-                onPress={() => navigation.replace('AIClassification', { patientInfo, symptoms, imageUri, imagePath: sourceImagePath, imageData, imageType })}
+                onPress={() => navigation.replace('AIClassification', { patientInfo, symptoms, imageUri, imagePath: sourceImagePath, imageData, imageType, preprocessingId })}
                 activeOpacity={0.8}>
                 <Text style={[styles.errorBtnText, styles.errorBtnTextPrimary]}>Retry</Text>
               </TouchableOpacity>
@@ -232,7 +230,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
           </View>
         )}
 
-        {/* Footer note */}
         <View style={styles.footerNote}>
           <Text style={styles.footerNoteText}>
             All inference runs locally on device. No data is transmitted to any server.
@@ -375,7 +372,7 @@ const styles = StyleSheet.create({
   stepLast: { borderBottomWidth: 0 },
   stepActive: { backgroundColor: Colors.primaryUltraLight },
   stepDone: { backgroundColor: Colors.successLight },
-  stepIcon: { fontSize: 16, marginRight: Spacing.md, width: 22 },
+  stepIcon: { fontSize: Typography.xs, marginRight: Spacing.md, width: 22 },
   stepText: {
     flex: 1,
     fontSize: Typography.sm,
@@ -390,6 +387,26 @@ const styles = StyleSheet.create({
     padding: Spacing.base,
     width: '100%',
     marginBottom: Spacing.base,
+  },
+  modelCard: {
+    backgroundColor: Colors.primaryUltraLight,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+    marginBottom: Spacing.base,
+  },
+  modelCardTitle: {
+    fontSize: Typography.sm,
+    color: Colors.primary,
+    fontWeight: Typography.bold,
+    marginBottom: 4,
+  },
+  modelCardText: {
+    fontSize: Typography.xs,
+    color: Colors.textSecondary,
+    lineHeight: Typography.xs * 1.6,
   },
   errorText: {
     fontSize: Typography.sm,
