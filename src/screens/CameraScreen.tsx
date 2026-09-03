@@ -141,11 +141,9 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
         flash: 'off',
         enableShutterSound: true,
       });
-      const base64 = await RNFS.readFile(photo.path, 'base64');
       navigateToConfirm({
         uri: `file://${photo.path}`,
         path: photo.path,
-        base64,
         type: 'image/jpeg',
         width: photo.width,
         height: photo.height,
@@ -166,7 +164,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }
     setLoading(true);
     launchImageLibrary(
-      { mediaType: 'photo', quality: 0.9, selectionLimit: 1, includeBase64: true, includeExtra: true },
+      { mediaType: 'photo', quality: 0.9, selectionLimit: 1, includeBase64: false, includeExtra: true },
       handleImageResult,
     );
   };

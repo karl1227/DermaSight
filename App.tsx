@@ -42,7 +42,7 @@ function App(): React.JSX.Element {
           translucent={false}
         />
         {ready ? (
-          <AppNavigator />
+          <AppNavigator initialRoute="Splash" />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
             <Text style={{ color: Colors.textSecondary }}>Preparing secure local database...</Text>

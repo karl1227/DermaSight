@@ -11,6 +11,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { markFirstRunCompleted } from '../database/database';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PrivacyConsent'>;
@@ -80,6 +81,11 @@ const XIcon = () => (
 const ICONS = { db: DbIcon, wifi: WifiIcon, x: XIcon };
 
 export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
+  const handleAgree = async () => {
+    await markFirstRunCompleted();
+    navigation.replace('MainTabs');
+  };
+
   const handleCancel = () => {
     Alert.alert(
       'Cancel',
@@ -142,7 +148,7 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.buttonGroup}>
           <TouchableOpacity
             style={styles.agreeBtn}
-            onPress={() => navigation.replace('MainTabs')}
+            onPress={handleAgree}
             activeOpacity={0.85}>
             <Text style={styles.agreeBtnText}>Agree and Continue</Text>
           </TouchableOpacity>

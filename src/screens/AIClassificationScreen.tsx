@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList, LesionClass } from '../types';
+import { RootStackParamList, LesionClass, ClassificationResult } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { runInference } from '../services/tfliteService';
 
@@ -50,6 +50,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [activeClass, setActiveClass] = useState<number>(-1);
+  const [classificationResult, setClassificationResult] = useState<ClassificationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -95,12 +96,8 @@ export const AIClassificationScreen: React.FC<Props> = ({
           preprocessingId,
         );
 
-        navigation.replace('Result', {
-          patientInfo,
-          symptoms,
-          imageUri,
-          result,
-        });
+        setClassificationResult(result);
+        setActiveClass(-1);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown runtime error';
         setError(`Classification failed: ${message}`);
@@ -115,6 +112,16 @@ export const AIClassificationScreen: React.FC<Props> = ({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  const handleContinue = () => {
+    if (!classificationResult) return;
+    navigation.replace('Result', {
+      patientInfo,
+      symptoms,
+      imageUri,
+      result: classificationResult,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -156,7 +163,9 @@ export const AIClassificationScreen: React.FC<Props> = ({
                 style={[
                   styles.chip,
                   idx === activeClass && styles.chipActive,
-                  completedSteps.length > 0 && idx < activeClass && styles.chipScanned,
+                  classificationResult
+                    ? styles.chipScanned
+                    : completedSteps.length > 0 && idx < activeClass && styles.chipScanned,
                 ]}>
                 <Text
                   style={[
@@ -228,6 +237,15 @@ export const AIClassificationScreen: React.FC<Props> = ({
               </TouchableOpacity>
             </View>
           </View>
+        )}
+
+        {classificationResult && !error && (
+          <TouchableOpacity
+            style={styles.continueBtn}
+            onPress={handleContinue}
+            activeOpacity={0.8}>
+            <Text style={styles.continueBtnText}>Continue to Screening Result</Text>
+          </TouchableOpacity>
         )}
 
         <View style={styles.footerNote}>
@@ -437,6 +455,20 @@ const styles = StyleSheet.create({
   },
   errorBtnTextPrimary: {
     color: Colors.white,
+  },
+  continueBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: Spacing.base,
+  },
+  continueBtnText: {
+    fontSize: Typography.base,
+    color: Colors.white,
+    fontWeight: Typography.bold,
   },
   footerNote: {
     backgroundColor: Colors.primaryUltraLight,

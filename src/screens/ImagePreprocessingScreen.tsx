@@ -9,6 +9,7 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -53,49 +54,36 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
 
   /** Start preprocessing when the screen mounts */
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    setIsRunning(true);
-    setError(null);
-    runPreprocessing(
-      {
-        base64: imageData,
-        mimeType: imageType,
-        filePath: sourceImagePath,
-      },
-      (stepId, completed) => {
-        setStepStates(prev => ({
-          ...prev,
-          [stepId]: { started: true, completed },
-        }));
-      },
-    )
-      .then(result => {
-        setProcessedUri(result.processedImagePath);
-        setPreprocessingId(result.id);
-        setIsRunning(false);
-        setIsDone(true);
-        // Auto-navigate to classification swiftly after a brief visual confirmation
-        timer = setTimeout(() => {
-          navigation.replace('AIClassification', {
-            patientInfo,
-            symptoms,
-            imageUri: result.processedImagePath ?? imageUri,
-            imagePath: sourceImagePath,
-            imageData,
-            imageType,
-            preprocessingId: result.id,
-          });
-        }, 600);
-      })
-      .catch(err => {
-        const message = err instanceof Error ? err.message : 'Unknown preprocessing error';
-        setError(`Preprocessing failed: ${message}`);
-        setIsRunning(false);
-      });
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      setIsRunning(true);
+      setError(null);
+      runPreprocessing(
+        {
+          base64: imageData,
+          mimeType: imageType,
+          filePath: sourceImagePath,
+        },
+        (stepId, completed) => {
+          setStepStates(prev => ({
+            ...prev,
+            [stepId]: { started: true, completed },
+          }));
+        },
+      )
+        .then(result => {
+          setProcessedUri(result.processedImagePath);
+          setPreprocessingId(result.id);
+          setIsRunning(false);
+          setIsDone(true);
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Unknown preprocessing error';
+          setError(`Preprocessing failed: ${message}`);
+          setIsRunning(false);
+        });
+    });
 
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    return () => interaction.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceImagePath, imageUri]);
 

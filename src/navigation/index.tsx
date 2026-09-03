@@ -56,15 +56,6 @@ import { LesionGuideScreen } from '../screens/LesionGuideScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-/**
- * Module-level flag: tracks whether this JS runtime has already gone through
- * the splash/onboarding flow in this session.
- *
- * - Cold start (app killed → reopened): new JS process → flag is false → Splash
- * - Metro dev reload (press R): same JS process re-renders → flag stays true → Home
- */
-let _sessionInitialised = false;
-
 // ─── Minimal line icons ───────────────────────────────────────────────────────
 
 const HomeIcon: React.FC<{ color: string }> = ({ color }) => (
@@ -175,19 +166,11 @@ function MainTabs() {
 
 // ─── Root Stack Navigator ─────────────────────────────────────────────────────
 
-export function AppNavigator() {
-  /**
-   * On first render of this navigator:
-   * - If not yet initialised → start from Splash (cold start path)
-   * - If already initialised → jump straight to MainTabs (dev reload path)
-   */
-  const initialRoute: keyof RootStackParamList = _sessionInitialised
-    ? 'MainTabs'
-    : 'Splash';
-
-  // Mark session as initialised after this render
-  _sessionInitialised = true;
-
+export function AppNavigator({
+  initialRoute,
+}: {
+  initialRoute: keyof RootStackParamList;
+}) {
   return (
     <NavigationContainer>
       <Stack.Navigator

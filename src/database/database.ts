@@ -44,6 +44,30 @@ export async function initDatabase(): Promise<void> {
       created_at             TEXT NOT NULL
     );
   `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    );
+  `);
+}
+
+/** Return whether the first-run onboarding and consent flow was completed. */
+export async function hasCompletedFirstRun(): Promise<boolean> {
+  const database = await getDb();
+  const result = await database.execute(
+    "SELECT value FROM app_settings WHERE key = 'first_run_completed'",
+  );
+  return result.rows?.[0]?.value === 'true';
+}
+
+/** Persist completion of the first-run onboarding and consent flow. */
+export async function markFirstRunCompleted(): Promise<void> {
+  const database = await getDb();
+  await database.execute(
+    "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('first_run_completed', 'true')",
+  );
 }
 
 /** Return the open DB instance, auto-initialising if needed */

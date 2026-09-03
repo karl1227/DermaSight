@@ -9,6 +9,7 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -33,38 +34,40 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
 
   React.useEffect(() => {
     let isMounted = true;
-
-    assessImageQuality(
-      {
-        base64: imageData,
-        mimeType: imageType,
-        filePath: imagePath ?? imageUri,
-      },
-      imageMeta,
-    )
-      .then(result => {
-        if (!isMounted) return;
-        setQualityChecks(result.checks);
-        setQualitySummary(result.summary);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setQualityChecks([
-          {
-            id: 'quality-error',
-            label: 'Image quality check unavailable',
-            status: 'info',
-            detail: 'The image could not be analyzed automatically, but you can still continue if it looks clear.',
-          },
-        ]);
-        setQualitySummary('Automatic quality analysis could not be completed.');
-      })
-      .finally(() => {
-        if (isMounted) setIsAssessing(false);
-      });
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      assessImageQuality(
+        {
+          base64: imageData,
+          mimeType: imageType,
+          filePath: imagePath ?? imageUri,
+        },
+        imageMeta,
+      )
+        .then(result => {
+          if (!isMounted) return;
+          setQualityChecks(result.checks);
+          setQualitySummary(result.summary);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setQualityChecks([
+            {
+              id: 'quality-error',
+              label: 'Image quality check unavailable',
+              status: 'info',
+              detail: 'The image could not be analyzed automatically, but you can still continue if it looks clear.',
+            },
+          ]);
+          setQualitySummary('Automatic quality analysis could not be completed.');
+        })
+        .finally(() => {
+          if (isMounted) setIsAssessing(false);
+        });
+    });
 
     return () => {
       isMounted = false;
+      interaction.cancel();
     };
   }, [imageData, imageMeta, imagePath, imageType, imageUri]);
 

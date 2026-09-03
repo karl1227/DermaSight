@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, StatusBar, Animated } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing } from '../theme';
-import { initDatabase } from '../database/database';
+import { hasCompletedFirstRun } from '../database/database';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Splash'>;
@@ -19,10 +19,16 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
       Animated.spring(scaleAnim, { toValue: 1, tension: 55, friction: 9, useNativeDriver: true }),
     ]).start();
 
-    initDatabase().catch(err => console.warn('DB init error:', err));
-
-    const timer = setTimeout(() => navigation.replace('Onboarding'), 2600);
-    return () => clearTimeout(timer);
+    let mounted = true;
+    const timer = setTimeout(async () => {
+      const completed = await hasCompletedFirstRun();
+      if (!mounted) return;
+      navigation.replace(completed ? 'MainTabs' : 'Onboarding');
+    }, 2600);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

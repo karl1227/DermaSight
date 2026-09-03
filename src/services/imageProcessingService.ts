@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import * as jpeg from 'jpeg-js';
+import RNFS from 'react-native-fs';
 
 export interface ImageMetadata {
   width?: number;
@@ -48,12 +49,17 @@ function decodeRgbFromJpeg(buffer: Buffer): { width: number; height: number; rgb
   return { width: decoded.width, height: decoded.height, rgb };
 }
 
-function decodeSource(source: ImageSource): { width: number; height: number; rgb: Uint8Array } {
-  if (!source.base64) {
+async function decodeSource(source: ImageSource): Promise<{ width: number; height: number; rgb: Uint8Array }> {
+  const base64 = source.base64 ?? (
+    source.filePath
+      ? await RNFS.readFile(source.filePath.startsWith('file://') ? source.filePath.slice(7) : source.filePath, 'base64')
+      : undefined
+  );
+  if (!base64) {
     throw new Error('No image payload available for decoding.');
   }
 
-  const buffer = Buffer.from(stripDataPrefix(source.base64), 'base64');
+  const buffer = Buffer.from(stripDataPrefix(base64), 'base64');
   return decodeRgbFromJpeg(buffer);
 }
 
@@ -110,7 +116,7 @@ export async function loadResizedImageRgb(
   source: ImageSource,
   size = DEFAULT_IMAGE_SIZE,
 ): Promise<Uint8Array> {
-  const decoded = decodeSource(source);
+  const decoded = await decodeSource(source);
   return bilinearResize(decoded.rgb, decoded.width, decoded.height, size, size);
 }
 
