@@ -196,21 +196,21 @@ export async function assessImageQuality(
     },
     {
       id: 'lighting',
-      label: 'Lighting looks usable',
+      label: 'Lighting estimate',
       status: brightnessPass ? 'pass' : 'warn',
       detail: brightnessPass
-        ? `Average brightness is ${brightness.mean.toFixed(0)} / 255, which is within a usable range.`
+        ? `Estimated average brightness is ${brightness.mean.toFixed(0)} / 255, within the recommended range.`
         : brightness.mean < 65
-          ? `Average brightness is ${brightness.mean.toFixed(0)} / 255, suggesting the image may be underexposed.`
-          : `Average brightness is ${brightness.mean.toFixed(0)} / 255, suggesting the image may be overexposed.`,
+          ? `Estimated average brightness is ${brightness.mean.toFixed(0)} / 255, suggesting the image may be underexposed.`
+          : `Estimated average brightness is ${brightness.mean.toFixed(0)} / 255, suggesting the image may be overexposed.`,
     },
     {
       id: 'sharpness',
-      label: 'Focus looks reasonably sharp',
+      label: 'Sharpness estimate',
       status: sharpnessPass ? 'pass' : 'warn',
       detail: sharpnessPass
-        ? `Edge contrast score is ${sharpness.toFixed(1)}, which is consistent with a usable image.`
-        : `Edge contrast score is ${sharpness.toFixed(1)}, which may indicate blur or heavy compression.`,
+        ? `Estimated edge contrast score is ${sharpness.toFixed(1)}, consistent with acceptable detail.`
+        : `Estimated edge contrast score is ${sharpness.toFixed(1)}, which may indicate blur or heavy compression.`,
     },
     {
       id: 'compressed',
@@ -228,7 +228,7 @@ export async function assessImageQuality(
     overallStatus: failedChecks > 0 ? 'warn' : 'pass',
     summary:
       failedChecks > 0
-        ? 'One or more image-quality checks need attention before analysis.'
-        : 'Image quality looks acceptable for preprocessing and analysis.',
+        ? 'Automated image-quality estimates need attention before analysis.'
+        : 'Automated image-quality estimates are within the recommended ranges.',
   };
 }

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  ScrollView,
   PermissionsAndroid,
   Platform,
   ActivityIndicator,
@@ -15,7 +14,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useIsFocused } from '@react-navigation/native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
-import RNFS from 'react-native-fs';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
@@ -27,18 +25,13 @@ type Props = {
 };
 
 const STEPS = ['Information', 'Symptoms', 'Scan'];
-
-const TIPS = [
-  'Center the lesion inside the guide',
-  'Use bright, even lighting',
-  'Hold steady to avoid blur',
-  'Keep only the affected skin area in view',
-];
+type LightMode = 'auto' | 'on' | 'off';
 
 export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const { patientInfo, symptoms } = route.params;
   const [loading, setLoading] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
+  const [lightMode, setLightMode] = useState<LightMode>('auto');
   const cameraRef = useRef<Camera>(null);
   const device = useCameraDevice('back');
   const isFocused = useIsFocused();
@@ -138,9 +131,11 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setLoading(true);
       const photo = await cameraRef.current.takePhoto({
-        flash: 'off',
+        flash: lightMode,
         enableShutterSound: true,
       });
+      setLoading(false);
+
       navigateToConfirm({
         uri: `file://${photo.path}`,
         path: photo.path,
@@ -169,10 +164,14 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
-  const [torchOn, setTorchOn] = useState(false);
-
   const canShowCamera = hasPermission && device;
   const supportsTorch = Boolean(device?.hasTorch);
+  const nextLightMode: Record<LightMode, LightMode> = { auto: 'on', on: 'off', off: 'auto' };
+  const lightLabel: Record<LightMode, string> = {
+    auto: 'Auto',
+    on: 'ON',
+    off: 'OFF',
+  };
 
   return (
     <View style={styles.container}>
@@ -186,11 +185,11 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.headerTitle}>Guided Image Capture</Text>
           {supportsTorch ? (
             <TouchableOpacity
-              onPress={() => setTorchOn(prev => !prev)}
-              style={[styles.torchBtn, torchOn && styles.torchBtnActive]}
+              onPress={() => setLightMode(mode => nextLightMode[mode])}
+              style={[styles.torchBtn, lightMode !== 'off' && styles.torchBtnActive]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={[styles.torchText, torchOn && styles.torchTextActive]}>
-                {torchOn ? '💡 Light ON' : '🔦 Light'}
+              <Text style={[styles.torchText, lightMode !== 'off' && styles.torchTextActive]}>
+                {lightMode === 'auto' ? '🔦 Light Auto' : `💡 Light ${lightLabel[lightMode]}`}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -216,7 +215,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
               style={StyleSheet.absoluteFill}
               device={device}
               isActive={isFocused}
-              torch={torchOn ? 'on' : 'off'}
+              torch={lightMode !== 'off' ? 'on' : 'off'}
               photo
             />
           ) : (

@@ -62,7 +62,6 @@ async function getModel(): Promise<TfliteModel> {
   }
 
   cachedModel = await loadTensorflowModel(
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('../assets/models/efficientnet_ham10000.tflite'),
     [],
   );
@@ -105,10 +104,24 @@ export async function runInference(
 ): Promise<ClassificationResult> {
   const model = await getModel();
   const preprocessedResult = getPreprocessedResult(preprocessingId);
+  if (preprocessingId && !preprocessedResult) {
+    throw new Error('The preprocessed image tensor is no longer available. Please preprocess the image again.');
+  }
   const inputBuffer = preprocessedResult?.inputTensor ?? await buildInputTensor(source);
+
+  if (inputBuffer.byteLength !== MODEL_INPUT_ELEMENTS * Float32Array.BYTES_PER_ELEMENT) {
+    throw new Error(`Unexpected input tensor size: ${inputBuffer.byteLength} bytes.`);
+  }
 
   const [outputBuffer] = await model.run([inputBuffer]);
   const probabilities = new Float32Array(outputBuffer);
+
+  if (
+    probabilities.length !== LABEL_MAP.length ||
+    probabilities.some(score => !Number.isFinite(score))
+  ) {
+    throw new Error(`Unexpected model output size: ${probabilities.length}.`);
+  }
 
   const predictions = Array.from(probabilities)
     .map((score, idx) => ({

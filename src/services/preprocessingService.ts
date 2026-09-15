@@ -118,7 +118,10 @@ export async function runPreprocessing(
   markStep(onStepUpdate, 'tensor', true);
 
   markStep(onStepUpdate, 'validate', false);
-  if (inputFloat32.length !== MODEL_INPUT_ELEMENTS) {
+  if (
+    inputFloat32.length !== MODEL_INPUT_ELEMENTS ||
+    inputFloat32.some(value => !Number.isFinite(value))
+  ) {
     throw new Error(`Unexpected tensor size: ${inputFloat32.length}`);
   }
   markStep(onStepUpdate, 'validate', true);

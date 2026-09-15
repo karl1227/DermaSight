@@ -71,6 +71,17 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [imageData, imageMeta, imagePath, imageType, imageUri]);
 
+  const warningChecks = qualityChecks.filter(check => check.status === 'warn');
+  const shouldSuggestRetake = !isAssessing && warningChecks.length > 0;
+  const canProceed = !isAssessing && qualityChecks.length > 0;
+  const retakeSuggestion = warningChecks.some(check => check.id === 'lighting')
+    ? warningChecks.some(check => check.id === 'sharpness')
+      ? 'Use brighter, even lighting and hold the phone steady while focusing on the lesion, then retake the photo.'
+      : 'Use the camera light or brighter, even lighting, then retake the photo for a clearer analysis.'
+    : warningChecks.some(check => check.id === 'sharpness')
+      ? 'Hold the phone steady, focus on the lesion, and retake the photo for clearer detail.'
+      : 'Retake the photo at a closer, well-lit resolution for a clearer analysis.';
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
@@ -141,6 +152,12 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ))
           )}
+          {shouldSuggestRetake && (
+            <View style={styles.retakeSuggestion}>
+              <Text style={styles.retakeSuggestionTitle}>Suggestion: Retake this image</Text>
+              <Text style={styles.retakeSuggestionText}>{retakeSuggestion}</Text>
+            </View>
+          )}
         </View>
 
         {/* Patient info */}
@@ -162,7 +179,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Action buttons */}
         <AppButton
-          label="Proceed to Preprocessing →"
+          label={isAssessing ? 'Assessing Image...' : 'Proceed to Preprocessing →'}
           onPress={() =>
             navigation.navigate('ImagePreprocessing', {
               patientInfo,
@@ -174,11 +191,13 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
             })
           }
           size="lg"
+          disabled={!canProceed}
+          loading={isAssessing}
           style={styles.proceedBtn}
         />
 
         <AppButton
-          label="Retake Image"
+          label={shouldSuggestRetake ? 'Retake for Better Lighting' : 'Retake Image'}
           onPress={() => navigation.goBack()}
           variant="outline"
           size="lg"
@@ -298,6 +317,25 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: Typography.xs,
     color: Colors.textMuted,
+    lineHeight: Typography.xs * 1.45,
+  },
+  retakeSuggestion: {
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.32)',
+  },
+  retakeSuggestionTitle: {
+    fontSize: Typography.sm,
+    fontWeight: Typography.bold,
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  retakeSuggestionText: {
+    fontSize: Typography.xs,
+    color: '#92400E',
     lineHeight: Typography.xs * 1.45,
   },
   infoCard: {

@@ -51,41 +51,54 @@ export const AIClassificationScreen: React.FC<Props> = ({
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [activeClass, setActiveClass] = useState<number>(-1);
   const [classificationResult, setClassificationResult] = useState<ClassificationResult | null>(null);
+  const [inferenceDurationMs, setInferenceDurationMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const spinner = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
         duration: 1800,
         useNativeDriver: true,
       }),
-    ).start();
+    );
+    spinner.start();
+    return () => spinner.stop();
   }, [rotateAnim]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const setProgressValue = (value: number) => {
+      setProgress(value);
+      Animated.timing(progressAnim, {
+        toValue: value / 100,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+    };
+
     const runClassification = async () => {
       try {
-        const stepDelay = 200;
-        for (let i = 0; i < INFERENCE_STEPS.length; i++) {
-          setCurrentStep(i);
-          setActiveClass(i % LESION_CLASSES.length);
-          await new Promise<void>(r => setTimeout(r, stepDelay));
+        setProgress(0);
+        progressAnim.setValue(0);
+        setCompletedSteps([]);
+        setClassificationResult(null);
+        setInferenceDurationMs(null);
+        setError(null);
+        setCurrentStep(0);
+        setActiveClass(-1);
+        setProgressValue(10);
+        setCompletedSteps(['s1']);
 
-          const progressValue = ((i + 1) / INFERENCE_STEPS.length) * 100;
-          setProgress(Math.round(progressValue));
-          Animated.timing(progressAnim, {
-            toValue: progressValue / 100,
-            duration: stepDelay * 0.8,
-            useNativeDriver: false,
-          }).start();
+        setCurrentStep(1);
+        setActiveClass(0);
+        setProgressValue(35);
 
-          setCompletedSteps(prev => [...prev, INFERENCE_STEPS[i].id]);
-        }
-
+        const inferenceStartedAt = Date.now();
         const result = await runInference(
           {
             base64: imageData,
@@ -96,17 +109,27 @@ export const AIClassificationScreen: React.FC<Props> = ({
           preprocessingId,
         );
 
+        if (cancelled) return;
+        setInferenceDurationMs(Date.now() - inferenceStartedAt);
+        setCompletedSteps(INFERENCE_STEPS.map(step => step.id));
+        setCurrentStep(INFERENCE_STEPS.length - 1);
+        setProgressValue(100);
         setClassificationResult(result);
         setActiveClass(-1);
       } catch (err) {
+        if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Unknown runtime error';
         setError(`Classification failed: ${message}`);
+        setActiveClass(-1);
       }
     };
 
     runClassification();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imagePath, imageUri, patientInfo, symptoms]);
+  }, [imagePath, imageUri, patientInfo, symptoms, preprocessingId]);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -149,7 +172,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
             </Animated.View>
             <View style={styles.progressInner}>
               <Text style={styles.progressPercent}>{progress}%</Text>
-              <Text style={styles.progressLabel}>Processing</Text>
+              <Text style={styles.progressLabel}>{classificationResult ? 'Complete' : 'Processing'}</Text>
             </View>
           </View>
         </View>
@@ -212,10 +235,13 @@ export const AIClassificationScreen: React.FC<Props> = ({
         </View>
 
         <View style={styles.modelCard}>
-          <Text style={styles.modelCardTitle}>Available CNN Model</Text>
+          <Text style={styles.modelCardTitle}>
+            {classificationResult ? 'CNN Analysis Complete' : 'Available CNN Model'}
+          </Text>
           <Text style={styles.modelCardText}>
-            EfficientNet TensorFlow Lite model trained for the supported
-            HAM10000 lesion classes.
+            {classificationResult
+              ? `The EfficientNet TensorFlow Lite model processed the captured image locally on this device${inferenceDurationMs !== null ? ` in ${(inferenceDurationMs / 1000).toFixed(2)} seconds` : ''}.`
+              : 'EfficientNet TensorFlow Lite model trained for the supported HAM10000 lesion classes.'}
           </Text>
         </View>
 
