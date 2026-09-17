@@ -80,23 +80,6 @@ async function buildInputTensor(source: ImageSource): Promise<ArrayBuffer> {
   return inputBuffer;
 }
 
-function buildRecommendation(status: ScreeningStatus, lesion: LesionClass): string {
-  switch (status) {
-    case 'High Concern':
-      return `The trained CNN model classified the image as ${lesion}. Please consult a licensed dermatologist promptly for clinical evaluation.`;
-    case 'Precancerous Indicator':
-      return `The trained CNN model classified the image as ${lesion}. A dermatologist evaluation is advised to rule out precancerous changes.`;
-    case 'Generally Benign':
-      return `The trained CNN model classified the image as ${lesion}. Continue routine monitoring and consult a dermatologist if the lesion changes.`;
-    default:
-      return 'The trained CNN model did not meet the minimum confidence threshold. Consider retaking a clearer image or consulting a licensed dermatologist.';
-  }
-}
-
-function buildRecommendationBasis(confidence: number): string {
-  return `Prediction and confidence are based only on the trained EfficientNet TFLite model output. Model confidence: ${confidence.toFixed(1)}%.`;
-}
-
 export async function runInference(
   source: ImageSource,
   _symptoms: SelectedSymptoms,
@@ -145,8 +128,6 @@ export async function runInference(
     screeningStatus,
     thresholdStatus,
     matchingVisualFeatures: [],
-    recommendationBasis: buildRecommendationBasis(modelConfidence),
-    recommendation: buildRecommendation(screeningStatus, lesion),
     assessmentMessage: getAssessmentMessage(screeningStatus, lesion),
   };
 }

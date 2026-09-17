@@ -14,6 +14,21 @@ export interface ImageSource {
   filePath?: string;
 }
 
+export interface NormalizedCrop {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface CroppedImage {
+  uri: string;
+  path: string;
+  width: number;
+  height: number;
+  fileSize: number;
+}
+
 export interface QualityCheck {
   id: string;
   label: string;
@@ -118,6 +133,42 @@ export async function loadResizedImageRgb(
 ): Promise<Uint8Array> {
   const decoded = await decodeSource(source);
   return bilinearResize(decoded.rgb, decoded.width, decoded.height, size, size);
+}
+
+/** Persists an automatically selected AOI crop as a JPEG. */
+export async function cropImageToJpeg(
+  source: ImageSource,
+  bounds: NormalizedCrop,
+): Promise<CroppedImage> {
+  const base64 = source.base64 ?? (
+    source.filePath
+      ? await RNFS.readFile(source.filePath.startsWith('file://') ? source.filePath.slice(7) : source.filePath, 'base64')
+      : undefined
+  );
+  if (!base64) throw new Error('No image payload available for AOI crop.');
+
+  const decoded = jpeg.decode(Buffer.from(stripDataPrefix(base64), 'base64'), {
+    useTArray: true,
+    formatAsRGBA: true,
+  });
+  if (!decoded?.data?.length) throw new Error('Could not decode image for AOI crop.');
+
+  const left = Math.max(0, Math.min(decoded.width - 1, Math.floor(bounds.left * decoded.width)));
+  const top = Math.max(0, Math.min(decoded.height - 1, Math.floor(bounds.top * decoded.height)));
+  const right = Math.max(left + 1, Math.min(decoded.width, Math.ceil(bounds.right * decoded.width)));
+  const bottom = Math.max(top + 1, Math.min(decoded.height, Math.ceil(bounds.bottom * decoded.height)));
+  const width = right - left;
+  const height = bottom - top;
+  const data = Buffer.alloc(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const from = ((top + row) * decoded.width + left) * 4;
+    data.set(decoded.data.subarray(from, from + width * 4), row * width * 4);
+  }
+
+  const encoded = jpeg.encode({ data, width, height }, 92).data;
+  const path = `${RNFS.CachesDirectoryPath}/lesion-aoi-${Date.now()}.jpg`;
+  await RNFS.writeFile(path, encoded.toString('base64'), 'base64');
+  return { uri: `file://${path}`, path, width, height, fileSize: encoded.length };
 }
 
 function luminance(r: number, g: number, b: number): number {

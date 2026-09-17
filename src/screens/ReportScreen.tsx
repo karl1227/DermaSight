@@ -285,12 +285,6 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Recommendation */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recommendation</Text>
-          <Text style={styles.recommendText}>{record.recommendation}</Text>
-        </View>
-
         {/* Medical Disclaimer */}
         <DisclaimerCard type="medical" />
 
@@ -542,11 +536,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   statusText: { fontSize: Typography.xs, fontWeight: Typography.semiBold },
-  recommendText: {
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    lineHeight: Typography.sm * 1.65,
-  },
   // ── Modal ──
   modalOverlay: {
     flex: 1,

@@ -16,7 +16,8 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
-import { assessImageQuality, type QualityCheck } from '../services/imageProcessingService';
+import { assessImageQuality, type CroppedImage, type QualityCheck } from '../services/imageProcessingService';
+import { createAutomaticAreaOfInterest, type SegmentationResult } from '../services/segmentationService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ConfirmImage'>;
@@ -31,6 +32,10 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [qualityChecks, setQualityChecks] = React.useState<QualityCheck[]>([]);
   const [qualitySummary, setQualitySummary] = React.useState('Assessing image quality...');
   const [isAssessing, setIsAssessing] = React.useState(true);
+  const [segmentation, setSegmentation] = React.useState<SegmentationResult | null>(null);
+  const [segmentationError, setSegmentationError] = React.useState(false);
+  const [isSelectingAoi, setIsSelectingAoi] = React.useState(true);
+  const [aoiImage, setAoiImage] = React.useState<CroppedImage | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -63,6 +68,23 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         .finally(() => {
           if (isMounted) setIsAssessing(false);
         });
+
+      createAutomaticAreaOfInterest({
+        base64: imageData,
+        mimeType: imageType,
+        filePath: imagePath ?? imageUri,
+      })
+        .then(result => {
+          if (!isMounted) return;
+          setSegmentation(result.segmentation);
+          setAoiImage(result.image ?? null);
+        })
+        .catch(() => {
+          if (isMounted) setSegmentationError(true);
+        })
+        .finally(() => {
+          if (isMounted) setIsSelectingAoi(false);
+        });
     });
 
     return () => {
@@ -73,7 +95,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const warningChecks = qualityChecks.filter(check => check.status === 'warn');
   const shouldSuggestRetake = !isAssessing && warningChecks.length > 0;
-  const canProceed = !isAssessing && qualityChecks.length > 0;
+  const canProceed = !isAssessing && !isSelectingAoi && qualityChecks.length > 0;
   const retakeSuggestion = warningChecks.some(check => check.id === 'lighting')
     ? warningChecks.some(check => check.id === 'sharpness')
       ? 'Use brighter, even lighting and hold the phone steady while focusing on the lesion, then retake the photo.'
@@ -103,13 +125,31 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Image preview */}
         <View style={styles.imageWrapper}>
           <Image
-            source={{ uri: imageUri }}
+            source={{ uri: aoiImage?.uri ?? imageUri }}
             style={styles.image}
             resizeMode="cover"
           />
           <View style={styles.imageBadge}>
-            <Text style={styles.imageBadgeText}>Preview</Text>
+            <Text style={styles.imageBadgeText}>{aoiImage ? 'Auto-selected AOI' : 'Preview'}</Text>
           </View>
+        </View>
+
+        <View style={styles.segmentationCard}>
+          <Text style={styles.segmentationTitle}>Lesion Segmentation</Text>
+          {segmentation ? (
+            <Text style={styles.segmentationText}>
+              {segmentation.lesionDetected
+                ? `A lesion region was identified and cropped automatically, covering about ${segmentation.coveragePercent}% of the original image.`
+                : 'No clear lesion region was identified. Center the lesion and retake the image if needed.'}
+            </Text>
+          ) : segmentationError ? (
+            <Text style={styles.segmentationText}>Segmentation was unavailable for this image. You can still continue with the quality review.</Text>
+          ) : (
+            <View style={styles.segmentationLoadingRow}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.segmentationText}>Finding the lesion region locally...</Text>
+            </View>
+          )}
         </View>
 
         {/* Quality assessment */}
@@ -179,20 +219,20 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Action buttons */}
         <AppButton
-          label={isAssessing ? 'Assessing Image...' : 'Proceed to Preprocessing →'}
+          label={isAssessing || isSelectingAoi ? 'Preparing Area of Interest...' : 'Proceed to Preprocessing →'}
           onPress={() =>
             navigation.navigate('ImagePreprocessing', {
               patientInfo,
               symptoms,
-              imageUri,
-              imagePath,
-              imageData,
-              imageType,
+              imageUri: aoiImage?.uri ?? imageUri,
+              imagePath: aoiImage?.path ?? imagePath,
+              imageData: aoiImage ? undefined : imageData,
+              imageType: aoiImage ? 'image/jpeg' : imageType,
             })
           }
           size="lg"
           disabled={!canProceed}
-          loading={isAssessing}
+          loading={isAssessing || isSelectingAoi}
           style={styles.proceedBtn}
         />
 
@@ -255,6 +295,31 @@ const styles = StyleSheet.create({
     fontSize: Typography.xs,
     color: Colors.white,
     fontWeight: Typography.semiBold,
+  },
+  segmentationCard: {
+    backgroundColor: Colors.primaryUltraLight,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+    padding: Spacing.base,
+    marginBottom: Spacing.base,
+  },
+  segmentationTitle: {
+    fontSize: Typography.base,
+    fontWeight: Typography.bold,
+    color: Colors.primary,
+    marginBottom: 4,
+  },
+  segmentationText: {
+    flex: 1,
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
+    lineHeight: Typography.sm * 1.45,
+  },
+  segmentationLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   qualityCard: {
     backgroundColor: Colors.surface,

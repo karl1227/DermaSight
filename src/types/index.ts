@@ -59,8 +59,6 @@ export interface ClassificationResult {
   screeningStatus: ScreeningStatus;
   thresholdStatus: ThresholdStatus;
   matchingVisualFeatures: string[];
-  recommendationBasis: string;
-  recommendation: string;
   assessmentMessage: string;
 }
 

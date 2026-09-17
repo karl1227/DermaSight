@@ -66,13 +66,13 @@ export function getAssessmentMessage(
 ): string {
   switch (status) {
     case 'High Concern':
-      return 'Prompt Dermatologist Consultation Recommended';
+      return 'Higher-Concern Classification';
     case 'Precancerous Indicator':
-      return 'Dermatologist Evaluation Advised';
+      return 'Precancerous Indicator Classification';
     case 'Generally Benign':
-      return 'Routine Monitoring — Continue Periodic Observation';
+      return 'Generally Benign Classification';
     default:
-      return 'Insufficient Confidence — Please Retake or Consult a Specialist';
+      return 'Low-Confidence Classification';
   }
 }
 

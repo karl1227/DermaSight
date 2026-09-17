@@ -64,10 +64,6 @@ export const ResultBasisCard: React.FC<ResultBasisCardProps> = ({ result }) => {
         </View>
       ))}
 
-      <View style={styles.divider} />
-
-      <Text style={styles.basisLabel}>Recommendation Basis</Text>
-      <Text style={styles.basisText}>{result.recommendationBasis}</Text>
     </AppCard>
   );
 };
@@ -146,11 +142,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     color: Colors.textSecondary,
     flex: 1,
-    lineHeight: 20,
-  },
-  basisText: {
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
     lineHeight: 20,
   },
 });

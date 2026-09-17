@@ -52,8 +52,9 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
         screening_status: result.screeningStatus,
         threshold_status: result.thresholdStatus,
         matching_visual_features: JSON.stringify(result.matchingVisualFeatures),
-        recommendation_basis: result.recommendationBasis,
-        recommendation: result.recommendation,
+        // Legacy database columns are kept so existing installations remain compatible.
+        recommendation_basis: '',
+        recommendation: '',
         created_at: new Date().toISOString(),
       });
 
@@ -173,12 +174,6 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Result basis */}
         <ResultBasisCard result={result} />
-
-        {/* Recommendation */}
-        <View style={styles.recommendCard}>
-          <Text style={styles.recommendTitle}>Recommendation</Text>
-          <Text style={styles.recommendText}>{result.recommendation}</Text>
-        </View>
 
         {/* Medical disclaimer */}
         <DisclaimerCard type="medical" />
@@ -350,25 +345,6 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: Typography.xs,
     fontWeight: Typography.semiBold,
-  },
-  recommendCard: {
-    backgroundColor: Colors.primaryUltraLight,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    marginBottom: Spacing.base,
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-  },
-  recommendTitle: {
-    fontSize: Typography.base,
-    fontWeight: Typography.bold,
-    color: Colors.primary,
-    marginBottom: Spacing.sm,
-  },
-  recommendText: {
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    lineHeight: Typography.sm * 1.65,
   },
   saveBtn: { marginBottom: Spacing.md },
   newBtn: { marginBottom: Spacing.md },

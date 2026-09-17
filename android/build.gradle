@@ -23,6 +23,7 @@ apply plugin: "com.facebook.react.rootproject"
 subprojects { p ->
     p.plugins.withId("com.android.library") {
         p.android {
+            ndkVersion rootProject.ext.ndkVersion
             defaultConfig {
                 externalNativeBuild {
                     cmake {
