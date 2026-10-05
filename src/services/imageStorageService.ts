@@ -6,7 +6,7 @@
 
 import RNFS from 'react-native-fs';
 
-const IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/skinsense_images`;
+const IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/dermasight_images`;
 
 /** Ensure the images directory exists */
 export async function ensureImageDirectory(): Promise<void> {

@@ -1,5 +1,5 @@
 /**
- * SkinSense Navigation
+ * DermaSight Navigation
  *
  * Structure:
  *   Root Stack

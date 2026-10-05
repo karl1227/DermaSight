@@ -9,15 +9,15 @@ interface DisclaimerCardProps {
 const DISCLAIMER_CONTENT = {
   medical: {
     title: 'Medical Disclaimer',
-    text: 'This result is not a medical diagnosis. The confidence score only represents the model\'s certainty based on image features and checklist inputs — not clinical certainty. Only a licensed dermatologist can confirm any skin condition through proper clinical evaluation. SkinSense is designed for preliminary educational screening only.',
+    text: 'This result is not a medical diagnosis. The confidence score only represents the model\'s certainty based on image features and checklist inputs — not clinical certainty. Only a licensed dermatologist can confirm any skin condition through proper clinical evaluation. DermaSight is designed for preliminary educational screening only.',
   },
   privacy: {
     title: 'Privacy Notice',
-    text: 'All data is stored locally on your device. No information is transmitted over the internet. SkinSense does not collect, share, or upload any personal or health information.',
+    text: 'All data is stored locally on your device. No information is transmitted over the internet. DermaSight does not collect, share, or upload any personal or health information.',
   },
   educational: {
     title: 'Educational Use Only',
-    text: 'SkinSense is an educational screening tool designed to raise awareness about pigmented skin lesions. It does not replace professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional for any health concerns.',
+    text: 'DermaSight is an educational screening tool designed to raise awareness about pigmented skin lesions. It does not replace professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional for any health concerns.',
   },
 };
 

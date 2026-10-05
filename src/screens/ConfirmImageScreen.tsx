@@ -36,6 +36,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [segmentationError, setSegmentationError] = React.useState(false);
   const [isSelectingAoi, setIsSelectingAoi] = React.useState(true);
   const [aoiImage, setAoiImage] = React.useState<CroppedImage | null>(null);
+  const [viewMode, setViewMode] = React.useState<'highlight' | 'crop'>('highlight');
 
   React.useEffect(() => {
     let isMounted = true;
@@ -122,17 +123,72 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
 
-        {/* Image preview */}
+        {/* Image preview with Lesion Highlight */}
         <View style={styles.imageWrapper}>
           <Image
-            source={{ uri: aoiImage?.uri ?? imageUri }}
+            source={{ uri: viewMode === 'crop' && aoiImage ? aoiImage.uri : imageUri }}
             style={styles.image}
             resizeMode="cover"
           />
+
+          {/* Real-time calculated Lesion Highlight Overlay on the full photo */}
+          {viewMode === 'highlight' && segmentation?.bounds && segmentation.lesionDetected && (
+            <View
+              style={[
+                styles.highlightBox,
+                {
+                  left: `${segmentation.bounds.left * 100}%`,
+                  top: `${segmentation.bounds.top * 100}%`,
+                  width: `${(segmentation.bounds.right - segmentation.bounds.left) * 100}%`,
+                  height: `${(segmentation.bounds.bottom - segmentation.bounds.top) * 100}%`,
+                },
+              ]}>
+              <View style={[styles.corner, styles.cornerTL]} />
+              <View style={[styles.corner, styles.cornerTR]} />
+              <View style={[styles.corner, styles.cornerBL]} />
+              <View style={[styles.corner, styles.cornerBR]} />
+              <View style={styles.highlightBadge}>
+                <Text style={styles.highlightBadgeText}>Detected Lesion</Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.imageBadge}>
-            <Text style={styles.imageBadgeText}>{aoiImage ? 'Auto-selected AOI' : 'Preview'}</Text>
+            <Text style={styles.imageBadgeText}>
+              {viewMode === 'crop' && aoiImage ? 'Auto-Cropped AOI' : 'Full Capture'}
+            </Text>
           </View>
         </View>
+
+        {/* View Mode Toggle */}
+        {aoiImage && segmentation?.lesionDetected && (
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, viewMode === 'highlight' && styles.toggleBtnActive]}
+              onPress={() => setViewMode('highlight')}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.toggleBtnText,
+                  viewMode === 'highlight' && styles.toggleBtnTextActive,
+                ]}>
+                Highlight Frame
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, viewMode === 'crop' && styles.toggleBtnActive]}
+              onPress={() => setViewMode('crop')}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.toggleBtnText,
+                  viewMode === 'crop' && styles.toggleBtnTextActive,
+                ]}>
+                Cropped Area (AOI)
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.segmentationCard}>
           <Text style={styles.segmentationTitle}>Lesion Segmentation</Text>
@@ -428,6 +484,87 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     fontWeight: Typography.semiBold,
     color: Colors.textPrimary,
+  },
+  highlightBox: {
+    position: 'absolute',
+    borderColor: Colors.accent,
+    borderWidth: 2,
+    backgroundColor: 'rgba(0, 201, 177, 0.15)',
+    borderRadius: Radius.md,
+  },
+  corner: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderColor: Colors.primary,
+  },
+  cornerTL: {
+    top: -2,
+    left: -2,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 4,
+  },
+  cornerTR: {
+    top: -2,
+    right: -2,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 4,
+  },
+  cornerBL: {
+    bottom: -2,
+    left: -2,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 4,
+  },
+  cornerBR: {
+    bottom: -2,
+    right: -2,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 4,
+  },
+  highlightBadge: {
+    position: 'absolute',
+    top: -22,
+    left: 0,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+  },
+  highlightBadgeText: {
+    color: Colors.white,
+    fontSize: Typography.xs,
+    fontWeight: Typography.bold,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.pill,
+    padding: 3,
+    marginBottom: Spacing.base,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: Radius.pill,
+  },
+  toggleBtnActive: {
+    backgroundColor: Colors.primary,
+  },
+  toggleBtnText: {
+    fontSize: Typography.sm,
+    fontWeight: Typography.semiBold,
+    color: Colors.textSecondary,
+  },
+  toggleBtnTextActive: {
+    color: Colors.white,
   },
   proceedBtn: { marginBottom: Spacing.md },
 });
