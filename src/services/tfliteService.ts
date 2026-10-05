@@ -11,7 +11,6 @@ import { getPreprocessedResult } from './preprocessingService';
 import {
   ClassificationResult,
   LesionClass,
-  ScreeningStatus,
   SelectedSymptoms,
   ThresholdStatus,
 } from '../types';

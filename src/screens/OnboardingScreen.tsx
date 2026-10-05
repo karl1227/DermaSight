@@ -8,10 +8,12 @@ import {
   Dimensions,
   StatusBar,
   ListRenderItem,
+  Alert,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { useAuth } from '../auth/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -64,7 +66,10 @@ const ChecklistIcon = () => (
   <View style={iconStyles.clipboard}>
     <View style={iconStyles.clipboardTop} />
     {[0, 1, 2].map(i => (
-      <View key={i} style={[iconStyles.clipboardLine, i === 2 && { width: '55%' }]} />
+      <View
+        key={i}
+        style={[iconStyles.clipboardLine, i === 2 && { width: '55%' }]}
+      />
     ))}
   </View>
 );
@@ -74,16 +79,28 @@ const ChipIcon = () => (
     <View style={iconStyles.chipInner} />
     {/* Pins */}
     {[0, 1].map(i => (
-      <View key={`t${i}`} style={[iconStyles.pin, iconStyles.pinTop, { left: 10 + i * 14 }]} />
+      <View
+        key={`t${i}`}
+        style={[iconStyles.pin, iconStyles.pinTop, { left: 10 + i * 14 }]}
+      />
     ))}
     {[0, 1].map(i => (
-      <View key={`b${i}`} style={[iconStyles.pin, iconStyles.pinBottom, { left: 10 + i * 14 }]} />
+      <View
+        key={`b${i}`}
+        style={[iconStyles.pin, iconStyles.pinBottom, { left: 10 + i * 14 }]}
+      />
     ))}
     {[0, 1].map(i => (
-      <View key={`l${i}`} style={[iconStyles.pin, iconStyles.pinLeft, { top: 10 + i * 14 }]} />
+      <View
+        key={`l${i}`}
+        style={[iconStyles.pin, iconStyles.pinLeft, { top: 10 + i * 14 }]}
+      />
     ))}
     {[0, 1].map(i => (
-      <View key={`r${i}`} style={[iconStyles.pin, iconStyles.pinRight, { top: 10 + i * 14 }]} />
+      <View
+        key={`r${i}`}
+        style={[iconStyles.pin, iconStyles.pinRight, { top: 10 + i * 14 }]}
+      />
     ))}
   </View>
 );
@@ -93,19 +110,40 @@ const ICONS = { phone: PhoneIcon, checklist: ChecklistIcon, chip: ChipIcon };
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
+  const auth = useAuth();
+  const [finishing, setFinishing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<OnboardingSlide>>(null);
 
+  const finish = async () => {
+    if (finishing) return;
+    if (auth.state.status !== 'authenticated') {
+      navigation.replace('Landing');
+      return;
+    }
+    setFinishing(true);
+    try {
+      await auth.completeOnboarding();
+      navigation.replace('MainTabs');
+    } catch {
+      Alert.alert(
+        'Could not finish setup',
+        'Please try again. Your account and records are preserved.',
+      );
+    } finally {
+      setFinishing(false);
+    }
+  };
   const goToNext = () => {
     if (currentIndex < SLIDES.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
       setCurrentIndex(prev => prev + 1);
     } else {
-      navigation.replace('Landing');
+      finish();
     }
   };
 
-  const handleSkip = () => navigation.replace('Landing');
+  const handleSkip = finish;
 
   const renderItem: ListRenderItem<OnboardingSlide> = ({ item }) => {
     const Icon = ICONS[item.iconVariant];
@@ -131,7 +169,11 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
 
       {/* Skip */}
-      <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+      <TouchableOpacity
+        style={styles.skipBtn}
+        onPress={handleSkip}
+        disabled={finishing}
+      >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
@@ -159,7 +201,12 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* CTA button */}
       <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.nextBtn} onPress={goToNext} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.nextBtn}
+          onPress={goToNext}
+          disabled={finishing}
+          activeOpacity={0.85}
+        >
           <Text style={styles.nextBtnText}>
             {currentIndex < SLIDES.length - 1 ? 'Next' : 'Get Started'}
           </Text>

@@ -15,6 +15,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, ScreeningRecord, ScreeningStatus, TabParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
+import { useAuth } from '../auth/AuthContext';
 import { getAllScreenings, deleteScreening } from '../database/database';
 import { deleteLocalImage } from '../services/imageStorageService';
 import { formatDate, formatConfidence, getStatusColor } from '../utils';
@@ -27,23 +28,28 @@ type Props = {
 };
 
 export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
+  const { owner } = useAuth();
+  const [loadError, setLoadError] = useState(false);
   const [records, setRecords] = useState<ScreeningRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadRecords = async () => {
+  const loadRecords = useCallback(async () => {
     try {
-      const data = await getAllScreenings();
+      if (!owner) { setRecords([]); return; }
+      const data = await getAllScreenings(owner);
+      setLoadError(false);
       setRecords(data);
     } catch {
+      setLoadError(true);
       setRecords([]);
     }
-  };
+  }, [owner]);
 
   // Reload when screen gains focus
   useFocusEffect(
     useCallback(() => {
       loadRecords();
-    }, []),
+    }, [loadRecords]),
   );
 
   const onRefresh = async () => {
@@ -62,9 +68,12 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           text: 'Okay',
           style: 'destructive',
           onPress: async () => {
-            await deleteLocalImage(item.image_path);
-            await deleteScreening(item.id!);
-            await loadRecords();
+            if (!owner) return;
+            try {
+              await deleteScreening(item.id!, owner);
+              await deleteLocalImage(item.image_path);
+              await loadRecords();
+            } catch { Alert.alert('Could not delete record', 'Please try again.'); }
           },
         },
       ],
@@ -93,7 +102,7 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.cardMeta}>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Patient ID</Text>
+            <Text style={styles.metaLabel}>Screening ID</Text>
             <Text style={styles.metaValue}>{item.patient_id}</Text>
           </View>
           <View style={styles.metaItem}>
@@ -122,13 +131,13 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   const EmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No Saved Screenings</Text>
+      <Text style={styles.emptyTitle}>{loadError ? 'Could not load records' : 'No Saved Screenings'}</Text>
       <Text style={styles.emptyText}>
-        Complete a screening and save the result to view it here.
+        {loadError ? 'Pull down to retry. Your saved records have not been deleted.' : 'Complete a screening to view the result here.'}
       </Text>
       <TouchableOpacity
         style={styles.emptyBtn}
-        onPress={() => navigation.navigate('PatientInfo')}
+        onPress={() => navigation.push('PatientInfo')}
         activeOpacity={0.8}>
         <Text style={styles.emptyBtnText}>Start First Screening</Text>
       </TouchableOpacity>

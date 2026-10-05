@@ -20,6 +20,7 @@ import { RootStackParamList, ScreeningRecord, ScreeningStatus } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
 import { DisclaimerCard } from '../components/DisclaimerCard';
+import { useAuth } from '../auth/AuthContext';
 import { getScreeningById, deleteScreening, updatePatientInfo } from '../database/database';
 import { deleteLocalImage, toImageUri } from '../services/imageStorageService';
 import { formatDate, formatConfidence, getStatusColor, safeJsonParse } from '../utils';
@@ -30,6 +31,8 @@ type Props = {
 };
 
 export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { owner } = useAuth();
+  const [imageMissing, setImageMissing] = useState(false);
   const { recordId } = route.params;
   const [record, setRecord] = useState<ScreeningRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,10 +45,12 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getScreeningById(recordId)
+    if (!owner) { setRecord(null); setLoading(false); return; }
+    getScreeningById(recordId, owner)
       .then(r => setRecord(r))
+      .catch(() => { setRecord(null); Alert.alert('Could not load report', 'Please try again.'); })
       .finally(() => setLoading(false));
-  }, [recordId]);
+  }, [recordId, owner]);
 
   const openEdit = () => {
     if (!record) return;
@@ -74,8 +79,9 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setSaving(true);
     try {
-      await updatePatientInfo(recordId, trimmedName, parsedAge, editSex);
-      const updated = await getScreeningById(recordId);
+      if (!owner) return;
+      await updatePatientInfo(recordId, trimmedName, parsedAge, editSex, owner);
+      const updated = await getScreeningById(recordId, owner);
       setRecord(updated);
       setEditVisible(false);
     } catch {
@@ -96,9 +102,12 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           style: 'destructive',
           onPress: async () => {
             if (!record) return;
-            await deleteLocalImage(record.image_path);
-            await deleteScreening(recordId);
-            navigation.goBack();
+            if (!owner) return;
+            try {
+              await deleteScreening(recordId, owner);
+              await deleteLocalImage(record.image_path);
+              navigation.goBack();
+            } catch { Alert.alert('Could not delete report', 'Please try again.'); }
           },
         },
       ],
@@ -189,10 +198,11 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}>
 
         {/* Lesion image */}
-        {record.image_path ? (
+        {record.image_path && !imageMissing ? (
           <Image
             source={{ uri: imageUri }}
             style={styles.image}
+            onError={() => setImageMissing(true)}
             resizeMode="cover"
           />
         ) : (
@@ -212,7 +222,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
-          <InfoRow label="Patient ID" value={record.patient_id} />
+          <InfoRow label="Screening ID" value={record.patient_id} />
           <View style={styles.divider} />
           <InfoRow label="Full Name" value={record.full_name} />
           <View style={styles.divider} />

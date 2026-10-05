@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,9 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
 import { ResultBasisCard } from '../components/ResultBasisCard';
 import { DisclaimerCard } from '../components/DisclaimerCard';
-import { insertScreening } from '../database/database';
-import { saveImageLocally } from '../services/imageStorageService';
+import { useAuth } from '../auth/AuthContext';
+import { insertScreening, historyEnabledFor } from '../database/database';
+import { saveImageLocally, deleteLocalImage } from '../services/imageStorageService';
 import { formatConfidence, getStatusColor } from '../utils';
 
 type Props = {
@@ -26,19 +27,32 @@ type Props = {
 
 export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
   const { patientInfo, symptoms, imageUri, result } = route.params;
+  const { owner } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const savingLock = useRef(false);
+  const savedIdRef = useRef<number | null>(null);
+  const [saveError, setSaveError] = useState('');
 
   const isLowConfidence = result.thresholdStatus === 'Below Threshold';
   const statusColor = getStatusColor(result.screeningStatus);
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSave = async (automatic = false) => {
+    if (savedIdRef.current) { if (!automatic) navigation.navigate('Report', { recordId: savedIdRef.current }); return; }
+    if (savingLock.current) return;
+    if (!owner || owner.id !== patientInfo.owner.id || owner.kind !== patientInfo.owner.kind) {
+      setSaveError('This screening session has ended. Start a new screening.'); return;
+    }
+    savingLock.current = true; setSaving(true); setSaveError('');
+    let savedImagePath = '';
     try {
+      if (!(await historyEnabledFor(owner))) { setSaveError('History saving is disabled in Settings.'); return; }
       // Save image to local storage and get persistent path
-      const savedImagePath = await saveImageLocally(imageUri);
+      savedImagePath = await saveImageLocally(imageUri);
 
       // Insert screening record into SQLite
       const insertedId = await insertScreening({
+        screening_id: patientInfo.screeningId,
         patient_id: patientInfo.patientId,
         full_name: patientInfo.fullName,
         age: patientInfo.age,
@@ -55,10 +69,11 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
         // Legacy database columns are kept so existing installations remain compatible.
         recommendation_basis: '',
         recommendation: '',
-        created_at: new Date().toISOString(),
-      });
+        created_at: patientInfo.createdAt,
+      }, owner);
+      savedIdRef.current = insertedId; setSavedId(insertedId);
 
-      Alert.alert(
+      if (!automatic) Alert.alert(
         'Saved',
         'Screening record has been saved to your history.',
         [
@@ -72,13 +87,19 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
           },
         ],
       );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      Alert.alert('Error', `Could not save the record. Details: ${errorMessage}`);
+    } catch {
+      if (savedImagePath) await deleteLocalImage(savedImagePath);
+      setSaveError('Could not save this screening. Keep this screen open and tap Retry Save.');
     } finally {
-      setSaving(false);
+      savingLock.current = false; setSaving(false);
     }
   };
+
+  useEffect(() => {
+    handleSave(true);
+    // One assessment is saved once; retries use the same screening UUID.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientInfo.screeningId]);
 
   return (
     <View style={styles.container}>
@@ -179,9 +200,10 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
         <DisclaimerCard type="medical" />
 
         {/* Action buttons */}
+        {saveError ? <Text accessibilityRole="alert" style={{ color: Colors.danger, marginBottom: 12 }}>{saveError}</Text> : null}
         <AppButton
-          label="Save Result to History"
-          onPress={handleSave}
+          label={savedId ? 'View Saved Report' : saveError ? 'Retry Save' : 'Save Result to History'}
+          onPress={() => handleSave()}
           size="lg"
           loading={saving}
           style={styles.saveBtn}
@@ -189,7 +211,7 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <AppButton
           label="New Screening"
-          onPress={() => navigation.navigate('PatientInfo')}
+          onPress={() => navigation.push('PatientInfo')}
           variant="outline"
           size="lg"
           style={styles.newBtn}

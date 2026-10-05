@@ -1,0 +1,16 @@
+{
+  "name": "dermasight-auth",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test *.test.mjs",
+    "accounts": "node --env-file-if-exists=.env admin.mjs"
+  },
+  "dependencies": {
+    "google-auth-library": "11.1.0"
+  }
+}

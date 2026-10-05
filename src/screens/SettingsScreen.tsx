@@ -1,26 +1,86 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   Switch,
   TouchableOpacity,
   Alert,
-  StatusBar,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
-import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
-import { deleteAllScreenings } from '../database/database';
+import { Colors, Typography, Spacing } from '../theme';
+import {
+  AccountScreen,
+  AccountColors,
+  LineIcon,
+  IconName,
+  a,
+} from '../components/AccountUI';
+import { useAuth } from '../auth/AuthContext';
+import { deleteLocalImage } from '../services/imageStorageService';
+import {
+  deleteAllScreenings,
+  getAllScreenings,
+  historyEnabledFor,
+  setHistoryEnabled,
+} from '../database/database';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 };
 
-export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const [historyEnabled, setHistoryEnabled] = useState(true);
+const SettingRow: React.FC<{
+  icon: IconName;
+  label: string;
+  sublabel?: string;
+  onPress?: () => void;
+  right?: React.ReactNode;
+  color?: string;
+}> = ({ icon, label, sublabel, onPress, right, color }) => (
+  <TouchableOpacity
+    style={styles.settingRow}
+    onPress={onPress}
+    disabled={!onPress && !right}
+    accessibilityRole={onPress ? 'button' : undefined}
+    activeOpacity={0.75}
+  >
+    <View
+      style={[
+        styles.rowIcon,
+        { backgroundColor: (color ?? Colors.primary) + '15' },
+      ]}
+    >
+      <LineIcon name={icon} size={21} color={color ?? AccountColors.teal} />
+    </View>
+    <View style={styles.rowContent}>
+      <Text style={[styles.rowLabel, color ? { color } : null]}>{label}</Text>
+      {sublabel ? <Text style={styles.rowSublabel}>{sublabel}</Text> : null}
+    </View>
+    {right ?? <LineIcon name="chevron" size={20} color={AccountColors.light} />}
+  </TouchableOpacity>
+);
 
+export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
+  const auth = useAuth();
+  const { owner } = auth;
+  const [historyEnabled, setHistoryEnabledValue] = useState(true);
+
+  useEffect(() => {
+    if (owner)
+      historyEnabledFor(owner)
+        .then(setHistoryEnabledValue)
+        .catch(() => Alert.alert('Settings unavailable', 'Please try again.'));
+  }, [owner]);
+  const changeHistory = async (enabled: boolean) => {
+    if (!owner) return;
+    try {
+      await setHistoryEnabled(owner, enabled);
+      setHistoryEnabledValue(enabled);
+    } catch {
+      Alert.alert('Could not save setting', 'Please try again.');
+    }
+  };
   const handleDeleteAll = () => {
     Alert.alert(
       'Delete All Records',
@@ -32,10 +92,18 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteAllScreenings();
+              if (!owner) return;
+              const records = await getAllScreenings(owner);
+              await deleteAllScreenings(owner);
+              await Promise.all(
+                records.map(record => deleteLocalImage(record.image_path)),
+              );
               Alert.alert('Done', 'All screening records have been deleted.');
             } catch {
-              Alert.alert('Error', 'Could not delete records. Please try again.');
+              Alert.alert(
+                'Error',
+                'Could not delete records. Please try again.',
+              );
             }
           },
         },
@@ -43,160 +111,168 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const SettingRow: React.FC<{
-    icon: string;
-    label: string;
-    sublabel?: string;
-    onPress?: () => void;
-    right?: React.ReactNode;
-    color?: string;
-  }> = ({ icon, label, sublabel, onPress, right, color }) => (
-    <TouchableOpacity
-      style={styles.settingRow}
-      onPress={onPress}
-      disabled={!onPress && !right}
-      activeOpacity={0.75}>
-      <View style={[styles.rowIcon, { backgroundColor: (color ?? Colors.primary) + '15' }]}>
-        <Text style={styles.rowIconText}>{icon}</Text>
-      </View>
-      <View style={styles.rowContent}>
-        <Text style={[styles.rowLabel, color ? { color } : null]}>{label}</Text>
-        {sublabel ? <Text style={styles.rowSublabel}>{sublabel}</Text> : null}
-      </View>
-      {right ?? <Text style={styles.chevron}>{'>'}</Text>}
-    </TouchableOpacity>
-  );
-
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+    <AccountScreen>
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={a.back}
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+      >
+        <LineIcon name="back" size={18} />
+        <Text style={a.link}>Back</Text>
+      </TouchableOpacity>
+      <Text style={a.title}>Settings</Text>
+      <Text style={a.subtitle}>
+        Manage your account and screening preferences
+      </Text>
+      <Text style={styles.groupLabel}>Account</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="user"
+          label={
+            auth.state.status === 'authenticated'
+              ? 'Edit Profile'
+              : 'Create Account'
+          }
+          sublabel={
+            auth.state.status === 'authenticated'
+              ? 'Full name and sex for future screenings'
+              : 'Keep your current guest screenings'
+          }
+          onPress={() =>
+            navigation.navigate(
+              auth.state.status === 'authenticated' ? 'EditProfile' : 'SignUp',
+            )
+          }
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          icon="shield"
+          label="Account Security"
+          sublabel="Sign-in method and verification information"
+          onPress={() => navigation.navigate('AccountSecurity')}
+        />
+      </View>
+      <Text style={styles.groupLabel}>Screening History</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="records"
+          label="Enable Screening History"
+          sublabel="Save screening records locally"
+          right={
+            <Switch
+              value={historyEnabled}
+              onValueChange={changeHistory}
+              trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+              thumbColor={historyEnabled ? Colors.primary : Colors.textMuted}
+            />
+          }
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          icon="trash"
+          label="Delete All Saved Records"
+          sublabel="Permanently remove all screening data"
+          onPress={handleDeleteAll}
+          color={Colors.danger}
+        />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        <Text style={styles.groupLabel}>Screening History</Text>
-        <View style={styles.group}>
-          <SettingRow
-            icon="H"
-            label="Enable Screening History"
-            sublabel="Save screening records locally"
-            right={
-              <Switch
-                value={historyEnabled}
-                onValueChange={setHistoryEnabled}
-                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={historyEnabled ? Colors.primary : Colors.textMuted}
-              />
-            }
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="D"
-            label="Delete All Saved Records"
-            sublabel="Permanently remove all screening data"
-            onPress={handleDeleteAll}
-            color={Colors.danger}
-          />
-        </View>
-
-        <Text style={styles.groupLabel}>Privacy & Legal</Text>
-        <View style={styles.group}>
-          <SettingRow
-            icon="P"
-            label="View Privacy & Data Consent"
-            onPress={() => navigation.navigate('PrivacyConsent')}
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="M"
-            label="View Medical Disclaimer"
-            onPress={() => navigation.navigate('MedicalDisclaimer')}
-          />
-        </View>
-      </ScrollView>
-    </View>
+      <Text style={styles.groupLabel}>Privacy & Legal</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="shield"
+          label="View Privacy & Data Consent"
+          onPress={() => navigation.navigate('SettingsPrivacyConsent')}
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          icon="medical"
+          label="View Medical Disclaimer"
+          onPress={() => navigation.navigate('SettingsMedicalDisclaimer')}
+        />
+      </View>
+      <Text style={styles.groupLabel}>About</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="info"
+          label="About DermaSight"
+          onPress={() => navigation.navigate('About')}
+        />
+      </View>
+      <Text style={styles.groupLabel}>Session</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="logout"
+          label={auth.state.status === 'guest' ? 'Exit Guest Mode' : 'Sign Out'}
+          color={Colors.danger}
+          onPress={() =>
+            Alert.alert(
+              'End session?',
+              auth.state.status === 'guest'
+                ? 'Create an account first to keep access to this guest history. Exiting closes this session.'
+                : 'Your local records are preserved for your next sign-in.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Sign Out',
+                  style: 'destructive',
+                  onPress: () =>
+                    auth
+                      .logout()
+                      .catch(() =>
+                        Alert.alert('Could not sign out', 'Please try again.'),
+                      ),
+                },
+              ],
+            )
+          }
+        />
+      </View>
+    </AccountScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    backgroundColor: Colors.primary,
-    paddingTop: Spacing.xxxl,
-    paddingBottom: Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-  },
-  backBtn: { marginBottom: Spacing.sm },
-  backText: {
-    fontSize: Typography.base,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: Typography.medium,
-  },
-  headerTitle: {
-    fontSize: Typography.xxl,
-    fontWeight: Typography.bold,
-    color: Colors.white,
-  },
-  scroll: { flex: 1 },
-  scrollContent: { padding: Spacing.xl, paddingBottom: Spacing.xxxl },
   groupLabel: {
     fontSize: Typography.xs,
     fontWeight: Typography.semiBold,
-    color: Colors.textMuted,
+    color: AccountColors.light,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: Spacing.sm,
     marginTop: Spacing.base,
   },
   group: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    ...Shadow.card,
+    ...a.card,
     marginBottom: Spacing.sm,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.base,
+    padding: 20,
+    minHeight: 76,
   },
   rowIcon: {
     width: 38,
     height: 38,
-    borderRadius: 10,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  rowIconText: {
-    fontSize: Typography.xs,
-    fontWeight: Typography.bold,
-    color: Colors.primary,
-    letterSpacing: 0.3,
-  },
-  rowContent: { flex: 1 },
+  rowContent: { flex: 1, marginRight: 12 },
   rowLabel: {
     fontSize: Typography.base,
-    color: Colors.textPrimary,
+    color: AccountColors.text,
     fontWeight: Typography.medium,
   },
   rowSublabel: {
     fontSize: Typography.xs,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  chevron: {
-    fontSize: 22,
-    color: Colors.textMuted,
-    fontWeight: Typography.regular,
+    color: AccountColors.muted,
+    lineHeight: 18,
+    marginTop: 4,
   },
   divider: {
     height: 1,

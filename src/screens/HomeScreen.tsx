@@ -1,3 +1,4 @@
+import { useConnectivity } from '../connectivity/ConnectivityContext';
 import React from 'react';
 import {
   View,
@@ -10,6 +11,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, TabParamList } from '../types';
+import { useAuth } from '../auth/AuthContext';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type Props = {
@@ -20,6 +22,8 @@ type Props = {
 };
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const { state } = useAuth();
+  const connectivity = useConnectivity();
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -28,17 +32,30 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Welcome to DermaSight</Text>
-          <Text style={styles.headerSubtitle}>AI-Assisted Skin Lesion Screening</Text>
+          <Text style={styles.headerSubtitle}>
+            {state.status === 'guest'
+              ? 'Guest · Local screening'
+              : state.status === 'authenticated'
+              ? `Hello, ${state.user.name}`
+              : 'AI-Assisted Skin Lesion Screening'}
+          </Text>
           <View style={styles.offlineBadge}>
             {/* wifi-slash icon */}
             <Text style={styles.offlineIcon}>&#8212;</Text>
-            <Text style={styles.offlineBadgeText}>Offline Mode Ready</Text>
+            <Text style={styles.offlineBadgeText}>
+              {connectivity === 'online'
+                ? 'Online · Local screening ready'
+                : connectivity === 'offline'
+                ? 'Offline · Screening available'
+                : 'Checking connection…'}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.settingsBtn}
           onPress={() => navigation.navigate('Settings')}
-          activeOpacity={0.75}>
+          activeOpacity={0.75}
+        >
           {/* Minimal gear icon */}
           <View style={styles.gearOuter}>
             <View style={styles.gearInner} />
@@ -61,8 +78,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.innerRing}>
             <TouchableOpacity
               style={styles.scanCircle}
-              onPress={() => navigation.navigate('PatientInfo')}
-              activeOpacity={0.82}>
+              onPress={() => navigation.push('PatientInfo')}
+              activeOpacity={0.82}
+            >
               {/* Scan frame corners */}
               <View style={styles.scanFrame}>
                 <View style={[styles.corner, styles.cornerTL]} />
@@ -76,10 +94,18 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('LesionGuide')}
+        style={{ padding: 16, alignItems: 'center' }}
+      >
+        <Text style={{ color: Colors.primary }}>Skin Lesion Guide</Text>
+      </TouchableOpacity>
       {/* Disclaimer card */}
       <View style={styles.disclaimerCard}>
         <Text style={styles.disclaimerText}>
-          DermaSight supports early awareness and does not provide final diagnosis
+          DermaSight supports early awareness and does not provide final
+          diagnosis
         </Text>
       </View>
     </View>
@@ -164,14 +190,14 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: Colors.textMuted,
   },
-  gearToothTop:    { top: -3,  left: 8 },
+  gearToothTop: { top: -3, left: 8 },
   gearToothBottom: { bottom: -3, left: 8 },
-  gearToothLeft:   { left: -3, top: 8 },
-  gearToothRight:  { right: -3, top: 8 },
-  gearToothTL:     { top: 0,   left: 0,   transform: [{ rotate: '45deg' }] },
-  gearToothTR:     { top: 0,   right: 0,  transform: [{ rotate: '45deg' }] },
-  gearToothBL:     { bottom: 0, left: 0,  transform: [{ rotate: '45deg' }] },
-  gearToothBR:     { bottom: 0, right: 0, transform: [{ rotate: '45deg' }] },
+  gearToothLeft: { left: -3, top: 8 },
+  gearToothRight: { right: -3, top: 8 },
+  gearToothTL: { top: 0, left: 0, transform: [{ rotate: '45deg' }] },
+  gearToothTR: { top: 0, right: 0, transform: [{ rotate: '45deg' }] },
+  gearToothBL: { bottom: 0, left: 0, transform: [{ rotate: '45deg' }] },
+  gearToothBR: { bottom: 0, right: 0, transform: [{ rotate: '45deg' }] },
   ctaArea: {
     flex: 1,
     alignItems: 'center',
@@ -214,10 +240,34 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
     borderWidth: 2.5,
   },
-  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 2 },
-  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 2 },
-  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 2 },
-  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 2 },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 2,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 2,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 2,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 2,
+  },
   scanText: {
     fontSize: Typography.base,
     fontWeight: Typography.semiBold,

@@ -11,6 +11,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { useAuth } from '../auth/AuthContext';
 import { markFirstRunCompleted } from '../database/database';
 
 type Props = {
@@ -28,20 +29,20 @@ const SECTIONS: Section[] = [
   {
     icon: 'db',
     title: 'On-Device Storage',
-    body: 'Profiles, logs, and captured images are stored purely in local SQLite storage.',
-    citation: 'ISO/IEC 25010',
+    body: 'Screening records stay in local SQLite. Images are stored as files on this device. Account profiles are stored by the account service and cached locally.',
+    citation: 'DermaSight data handling',
   },
   {
     icon: 'wifi',
     title: 'Offline Processing',
     body: 'TensorFlow Lite executes CNN inferences locally on-device with zero internet reliance.',
-    citation: 'ISO/IEC 25010',
+    citation: 'DermaSight data handling',
   },
   {
     icon: 'x',
-    title: 'Zero Server Uploads',
-    body: 'No cloud backups, third-party tracking, or external server data transfers occur.',
-    citation: 'RA 10173 Data Privacy Act',
+    title: 'Account Connections',
+    body: 'Skin images and screening results are not uploaded. Account sign-in sends account details to the account service; Google Sign-In sends an identity token for verification. Internet is needed for account sign-in and profile updates.',
+    citation: 'DermaSight data handling',
   },
 ];
 
@@ -62,7 +63,14 @@ const WifiIcon = () => (
         key={i}
         style={[
           iconS.wifiArc,
-          { width: s, height: s, borderRadius: s, borderTopLeftRadius: 0, borderTopRightRadius: 0, bottom: i * 3 },
+          {
+            width: s,
+            height: s,
+            borderRadius: s,
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+            bottom: i * 3,
+          },
           i === 0 && { opacity: 0.3 },
           i === 1 && { opacity: 0.6 },
         ]}
@@ -81,9 +89,15 @@ const XIcon = () => (
 const ICONS = { db: DbIcon, wifi: WifiIcon, x: XIcon };
 
 export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
+  const { completeConsent } = useAuth();
   const handleAgree = async () => {
-    await markFirstRunCompleted();
-    navigation.replace('MainTabs');
+    try {
+      await markFirstRunCompleted();
+      completeConsent();
+      navigation.replace('MainTabs');
+    } catch {
+      Alert.alert('Could not save consent', 'Please try again.');
+    }
   };
 
   const handleCancel = () => {
@@ -105,7 +119,8 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={handleCancel}
-          activeOpacity={0.7}>
+          activeOpacity={0.7}
+        >
           <Text style={styles.backBtnText}>‹ Back</Text>
         </TouchableOpacity>
       </View>
@@ -113,8 +128,8 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Shield icon + header */}
         <View style={styles.headerArea}>
           <View style={styles.iconCircle}>
@@ -122,10 +137,12 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.shield} />
           </View>
           <Text style={styles.pageTitle}>Privacy & Data Consent</Text>
-          <Text style={styles.pageSubtitle}>Your data security and privacy matter</Text>
+          <Text style={styles.pageSubtitle}>
+            Your data security and privacy matter
+          </Text>
         </View>
 
-        {SECTIONS.map((section) => {
+        {SECTIONS.map(section => {
           const Icon = ICONS[section.icon];
           return (
             <View key={section.title} style={styles.card}>
@@ -149,14 +166,16 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={styles.agreeBtn}
             onPress={handleAgree}
-            activeOpacity={0.85}>
+            activeOpacity={0.85}
+          >
             <Text style={styles.agreeBtnText}>Agree and Continue</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.cancelBtn}
             onPress={handleCancel}
-            activeOpacity={0.7}>
+            activeOpacity={0.7}
+          >
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
