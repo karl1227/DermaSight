@@ -1,4 +1,4 @@
-// ─── SkinSense Theme ─────────────────────────────────────────────────────────
+// ─── DermaSight Theme ─────────────────────────────────────────────────────────
 // Clinical teal and white design system
 
 export const Colors = {

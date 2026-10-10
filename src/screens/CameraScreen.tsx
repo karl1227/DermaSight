@@ -251,7 +251,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
           : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
       const granted = await PermissionsAndroid.request(permission, {
         title: 'Gallery Permission',
-        message: 'SkinSense needs gallery access to select skin lesion images.',
+        message: 'DermaSight needs gallery access to select skin lesion images.',
         buttonPositive: 'Allow',
         buttonNegative: 'Deny',
       });

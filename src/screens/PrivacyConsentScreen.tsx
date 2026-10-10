@@ -104,7 +104,7 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
   const handleCancel = () => {
     Alert.alert(
       'Cancel',
-      'You must agree to continue using SkinSense. Go back?',
+      'You must agree to continue using DermaSight. Go back?',
       [
         { text: 'Stay', style: 'cancel' },
         { text: 'Go Back', onPress: () => navigation.goBack() },

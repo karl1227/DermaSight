@@ -28,7 +28,9 @@ export async function saveImageLocally(sourceUri: string): Promise<string> {
 
   const timestamp = secureId();
   const candidate = sourceUri.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const extension = ['jpg', 'jpeg', 'png', 'heic', 'heif'].includes(candidate) ? candidate : 'jpg';
+  const extension = ['jpg', 'jpeg', 'png', 'heic', 'heif'].includes(candidate)
+    ? candidate
+    : 'jpg';
   const fileName = `lesion_${timestamp}.${extension}`;
   const destPath = `${IMAGE_DIR}/${fileName}`;
 
@@ -39,7 +41,9 @@ export async function saveImageLocally(sourceUri: string): Promise<string> {
 
   const exists = await RNFS.exists(cleanSource);
   if (!exists) {
-    throw new Error('The image is no longer available. Please capture or select it again.');
+    throw new Error(
+      'The image is no longer available. Please capture or select it again.',
+    );
   }
 
   await RNFS.copyFile(cleanSource, destPath);

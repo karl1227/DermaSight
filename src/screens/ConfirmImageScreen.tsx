@@ -46,6 +46,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [attempt, setAttempt] = React.useState(0);
   const [isPreparing, setIsPreparing] = React.useState(true);
   const [zoom, setZoom] = React.useState(1);
+  const [viewMode, setViewMode] = React.useState<'crop' | 'highlight'>('crop');
 
   React.useEffect(() => {
     let active = true;
@@ -86,6 +87,15 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
       interaction.cancel();
     };
   }, [imageData, imageMeta, imagePath, imageType, imageUri, attempt, zoom]);
+
+  const original = prepared?.originalImage;
+  const bounds = prepared?.lesionBounds;
+  const showOriginal = viewMode === 'highlight' && Boolean(original);
+  const fit = original
+    ? Math.min(IMAGE_SIZE / original.width, IMAGE_SIZE / original.height)
+    : 1;
+  const originalWidth = (original?.width ?? IMAGE_SIZE) * fit;
+  const originalHeight = (original?.height ?? IMAGE_SIZE) * fit;
 
   return (
     <View style={styles.container}>
@@ -132,10 +142,32 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Image preview; quality and automatic cropping still run locally. */}
         <View style={styles.imageWrapper}>
           <Image
-            source={{ uri: prepared?.image.uri ?? imageUri }}
+            source={{
+              uri: showOriginal
+                ? original!.uri
+                : prepared?.image.uri ?? imageUri,
+            }}
             style={styles.image}
-            resizeMode="cover"
+            resizeMode="contain"
           />
+          {showOriginal && bounds && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.lesionHighlight,
+                {
+                  left:
+                    (IMAGE_SIZE - originalWidth) / 2 +
+                    bounds.left * originalWidth,
+                  top:
+                    (IMAGE_SIZE - originalHeight) / 2 +
+                    bounds.top * originalHeight,
+                  width: (bounds.right - bounds.left) * originalWidth,
+                  height: (bounds.bottom - bounds.top) * originalHeight,
+                },
+              ]}
+            />
+          )}
           {isPreparing && (
             <View
               style={styles.loadingOverlay}
@@ -146,6 +178,25 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
         </View>
+
+        {prepared?.cropped && original && !isPreparing && (
+          <View style={styles.previewModes}>
+            <AppButton
+              label={bounds ? 'Lesion Highlight' : 'Original Image'}
+              variant={showOriginal ? 'primary' : 'outline'}
+              size="sm"
+              fullWidth={false}
+              onPress={() => setViewMode('highlight')}
+            />
+            <AppButton
+              label="Selected ROI"
+              variant={showOriginal ? 'outline' : 'primary'}
+              size="sm"
+              fullWidth={false}
+              onPress={() => setViewMode('crop')}
+            />
+          </View>
+        )}
 
         {isPreparing ? (
           <Text style={styles.unavailableText} accessibilityLiveRegion="polite">
@@ -323,6 +374,19 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   proceedBtn: { marginBottom: Spacing.md },
+  lesionHighlight: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: Colors.accent,
+    backgroundColor: 'rgba(0, 201, 177, 0.15)',
+    borderRadius: Radius.sm,
+  },
+  previewModes: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
   zoomControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',

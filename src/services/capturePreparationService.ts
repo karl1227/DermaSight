@@ -5,6 +5,7 @@ import {
   type ImageSource,
   type ImageMetadata,
   type CroppedImage,
+  type NormalizedCrop,
 } from './imageProcessingService';
 import { validateSkin } from './skinValidationService';
 import { createAutomaticAreaOfInterest } from './segmentationService';
@@ -19,6 +20,8 @@ export interface PreparedCapture {
   cropped: boolean;
   maxZoom: number;
   validationMethod: 'appearance' | 'model';
+  originalImage: CroppedImage;
+  lesionBounds?: NormalizedCrop;
 }
 
 function assertUsableQuality(metrics: {
@@ -106,8 +109,10 @@ export async function prepareCapture(
   onStage('Finding the lesion');
   let selected = image;
   let cropped = false;
+  let lesionBounds: NormalizedCrop | undefined;
   try {
     const aoi = await createAutomaticAreaOfInterest(normalizedSource);
+    lesionBounds = aoi.segmentation?.bounds;
     // Avoid unusable tiny crops; keep surrounding skin and the original fallback.
     if (aoi.image && aoi.image.width >= 224 && aoi.image.height >= 224) {
       selected = aoi.image;
@@ -152,5 +157,13 @@ export async function prepareCapture(
     () => {},
   );
   checkActive();
-  return { image: selected, preprocessing, cropped, maxZoom, validationMethod };
+  return {
+    image: selected,
+    preprocessing,
+    cropped,
+    maxZoom,
+    validationMethod,
+    originalImage: image,
+    lesionBounds,
+  };
 }

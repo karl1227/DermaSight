@@ -24,6 +24,12 @@ git switch codex/preserve-app-before-model
 
 Keep the model-update branch for review. Do not reset or overwrite local changes to switch branches.
 
+## PR #2 merge resolution (October 10)
+
+Merged `origin/main` into the feature branch for review. The DermaSight display/module name is now consistent across JavaScript, Android and iOS. Existing `skinsense.db` and `skinsense_images` storage names remain unchanged to preserve installed users' history. Google callback and photo-library permission entries are retained.
+
+The main branch's lesion-highlight preview is combined with the newer shared capture/gallery validation and preprocessing flow. The preview can show the original image with bounds or the selected ROI; classification always receives the prepared ROI tensor. Bounding boxes account for the original image's aspect ratio. The classifier asset and its SHA-256 remain unchanged.
+
 ## iPhone unresolved-ops repair
 
 The phone reported `Status: unresolved-ops` while allocating the classifier tensors. The export contains FlexMul, FlexConv2D and other Select TensorFlow operators. The standard TensorFlowLiteC runtime alone cannot execute them.

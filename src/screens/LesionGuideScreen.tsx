@@ -222,7 +222,7 @@ export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.abcdeContent}>
             <Text style={styles.abcdeIntro}>
               The ABCDE criteria are a widely used guide to help identify early
-              warning signs of melanoma. SkinSense asks about these criteria as
+              warning signs of melanoma. DermaSight asks about these criteria as
               part of the symptom checklist before every screening.
             </Text>
             {ABCDE_ITEMS.map(item => (

@@ -1,6 +1,6 @@
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
-import { InteractionManager, Text } from 'react-native';
+import { Image, InteractionManager, Text } from 'react-native';
 import { ConfirmImageScreen } from '../src/screens/ConfirmImageScreen';
 import { AppButton } from '../src/components/AppButton';
 import { prepareCapture } from '../src/services/capturePreparationService';
@@ -71,6 +71,9 @@ test('non-skin upload shows error and blocks Analyze even if its handler is invo
 test('accepted upload sends the prepared ROI tensor to existing classification', async () => {
   prepare.mockResolvedValue({
     image: { uri: 'file:///roi.jpg', path: '/roi.jpg' },
+    originalImage: { uri: 'file:///original.jpg', width: 600, height: 450 },
+    lesionBounds: { x: 0.3, y: 0.3, width: 0.2, height: 0.2 },
+    cropped: true,
     preprocessing: { id: 'prepared-upload' },
     maxZoom: 1,
     validationMethod: 'appearance',
@@ -81,6 +84,13 @@ test('accepted upload sends the prepared ROI tensor to existing classification',
       .findAllByType(Text)
       .some(node => node.props.children === 'Review Uploaded Image'),
   ).toBe(true);
+  const highlight = tree.root
+    .findAllByType(AppButton)
+    .find(node => node.props.label === 'Lesion Highlight')!;
+  await act(async () => highlight.props.onPress());
+  expect(tree.root.findByType(Image).props.source.uri).toBe(
+    'file:///original.jpg',
+  );
   const analyze = tree.root
     .findAllByType(AppButton)
     .find(node => node.props.label === 'Analyze Image')!;

@@ -1,5 +1,5 @@
 /**
- * SkinSense SQLite Database Service
+ * DermaSight SQLite Database Service
  * Uses @op-engineering/op-sqlite v16 — compatible with RN 0.86 / New Arch.
  *
  * API notes for this version:
@@ -14,6 +14,7 @@ import { ScreeningRecord } from '../types';
 import { Owner, User } from '../auth/types';
 import { secureId } from '../utils/secureId';
 
+// Preserve the existing on-device database across the display-name change.
 const DB_NAME = 'skinsense.db';
 
 let db: DB | null = null;

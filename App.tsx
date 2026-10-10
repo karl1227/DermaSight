@@ -1,5 +1,5 @@
 /**
- * SkinSense — AI-Assisted Pigmented Skin Lesion Screening
+ * DermaSight — AI-Assisted Pigmented Skin Lesion Screening
  * React Native CLI · TypeScript · Offline · SQLite
  *
  * Educational screening tool — not a medical diagnosis.
