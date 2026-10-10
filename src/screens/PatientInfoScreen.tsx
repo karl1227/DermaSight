@@ -13,15 +13,26 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, PatientInfo } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { ProgressSteps } from '../components/ProgressSteps';
-import { generatePatientId } from '../utils';
+import { secureId } from '../utils/secureId';
+import { useAuth } from '../auth/AuthContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PatientInfo'>;
 };
 
 const LESION_LOCATIONS = [
-  'Face', 'Neck', 'Arm', 'Torso', 'Shoulder',
-  'Back', 'Chest', 'Hand', 'Leg', 'Foot', 'Other',
+  'Arm',
+  'Torso',
+  'Shoulder',
+  'Back',
+  'Chest',
+  'Hand',
+  'Face',
+  'Neck',
+  'Leg',
+  'Foot',
+  'Other',
 ];
 
 const SEX_OPTIONS: Array<PatientInfo['sex']> = ['Male', 'Female', 'Other'];
@@ -29,19 +40,43 @@ const SEX_OPTIONS: Array<PatientInfo['sex']> = ['Male', 'Female', 'Other'];
 const STEPS = ['Information', 'Symptoms', 'Scan'];
 
 export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
-  const [patientId] = useState(generatePatientId());
-  const [fullName, setFullName] = useState('');
+  const { state, owner } = useAuth();
+  const user = state.status === 'authenticated' ? state.user : null;
+  const [patientId] = useState(secureId);
+  const [createdAt] = useState(() => new Date().toISOString());
+  const [fullName, setFullName] = useState(user?.name ?? '');
+  const [moreLocations, setMoreLocations] = useState(false);
+  const [sexExpanded, setSexExpanded] = useState(false);
   const [age, setAge] = useState('');
-  const [sex, setSex] = useState<PatientInfo['sex']>('');
+  const [sex, setSex] = useState<PatientInfo['sex']>(user?.sex ?? '');
   const [lesionLocation, setLesionLocation] = useState('');
 
+  const missing = [
+    !owner || !patientId ? 'Enter guest mode or sign in' : '',
+    !(user?.name ?? fullName).trim() ? 'Full name is required' : '',
+    !age ||
+    !Number.isInteger(Number(age)) ||
+    Number(age) < 1 ||
+    Number(age) > 120
+      ? 'Enter an age from 1 to 120'
+      : '',
+    !(user?.sex ?? sex) ? 'Select sex' : '',
+    !lesionLocation ? 'Select a lesion location' : '',
+  ].filter(Boolean);
   const handleContinue = () => {
-    if (!fullName.trim()) {
+    if (!owner || !patientId) {
+      Alert.alert(
+        'Session required',
+        'Please enter guest mode or sign in again.',
+      );
+      return;
+    }
+    if (!(user?.name ?? fullName).trim()) {
       Alert.alert('Required', "Please enter the patient's full name.");
       return;
     }
-    const ageNum = parseInt(age, 10);
-    if (!age || isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+    const ageNum = Number(age);
+    if (!age || !Number.isInteger(ageNum) || ageNum < 1 || ageNum > 120) {
       Alert.alert('Required', 'Please enter a valid age (1-120).');
       return;
     }
@@ -54,16 +89,31 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
     navigation.navigate('SymptomChecklist', {
-      patientInfo: { patientId, fullName: fullName.trim(), age: ageNum, sex, lesionLocation },
+      patientInfo: {
+        patientId,
+        screeningId: patientId,
+        createdAt,
+        owner,
+        fullName: (user?.name ?? fullName).trim(),
+        age: ageNum,
+        sex: user?.sex ?? sex,
+        lesionLocation,
+      },
     });
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right', 'bottom']}
+    >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
 
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+        >
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -72,10 +122,12 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.pageTitle}>Basic Screening Information</Text>
         <Text style={styles.pageSubtitle}>
-          This information helps improve the context of the preliminary screening
+          This information helps improve the context of the preliminary
+          screening
         </Text>
 
         <View style={styles.progressWrapper}>
@@ -83,19 +135,21 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <View style={styles.rowFields}>
-          <View style={[styles.fieldGroup, { flex: 1, marginRight: Spacing.md }]}>
+          <View
+            style={[styles.fieldGroup, { flex: 1, marginRight: Spacing.md }]}
+          >
             <View style={styles.labelRow}>
-            
-              <Text style={styles.fieldLabel}>Patient ID</Text>
+              <Text style={styles.fieldLabel}>Screening ID</Text>
             </View>
             <View style={styles.idField}>
-              <Text style={styles.idText}>Auto-assigned</Text>
+              <Text style={styles.idText}>
+                SCR-{patientId.slice(0, 8).toUpperCase()}
+              </Text>
             </View>
           </View>
 
           <View style={[styles.fieldGroup, { flex: 1 }]}>
             <View style={styles.labelRow}>
-            
               <Text style={styles.fieldLabel}>Age</Text>
             </View>
             <TextInput
@@ -113,12 +167,12 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-  
             <Text style={styles.fieldLabel}>Full Name</Text>
           </View>
           <TextInput
             style={styles.input}
-            value={fullName}
+            value={user?.name ?? fullName}
+            editable={!user}
             onChangeText={setFullName}
             placeholder="Enter full name"
             placeholderTextColor={Colors.textMuted}
@@ -129,70 +183,122 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-        
             <Text style={styles.fieldLabel}>Sex</Text>
           </View>
-          <View style={styles.sexDropdown}>
-            {SEX_OPTIONS.map(option => (
-              <TouchableOpacity
-                key={option}
-                style={[styles.sexOption, sex === option && styles.sexOptionSelected]}
-                onPress={() => setSex(option)}
-                activeOpacity={0.8}>
-                <Text style={[styles.sexOptionText, sex === option && styles.sexOptionTextSelected]}>
-                  {option}
-                </Text>
-                {sex === option && <Text style={styles.sexChevron}>v</Text>}
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={[
+              styles.input,
+              { flexDirection: 'row', justifyContent: 'space-between' },
+            ]}
+            disabled={!!user}
+            onPress={() => setSexExpanded(!sexExpanded)}
+            accessibilityRole="button"
+            accessibilityLabel="Sex"
+          >
+            <Text
+              style={{ color: sex ? Colors.textPrimary : Colors.textMuted }}
+            >
+              {user?.sex ?? (sex || 'Select sex')}
+            </Text>
+            {!user && <Text style={{ color: Colors.primary }}>⌄</Text>}
+          </TouchableOpacity>
+          {sexExpanded && !user && (
+            <View style={[styles.sexDropdown, { marginTop: 8 }]}>
+              {SEX_OPTIONS.map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.sexOption,
+                    sex === option && styles.sexOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setSex(option);
+                    setSexExpanded(false);
+                  }}
+                >
+                  <Text style={styles.sexOptionText}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.fieldGroup}>
           <View style={styles.labelRow}>
-           
             <Text style={styles.fieldLabel}>Lesion Location</Text>
           </View>
           <View style={styles.chipRow}>
-            {LESION_LOCATIONS.map(loc => (
+            {(moreLocations
+              ? LESION_LOCATIONS
+              : LESION_LOCATIONS.slice(0, 6)
+            ).map(loc => (
               <TouchableOpacity
                 key={loc}
-                style={[styles.locationChip, lesionLocation === loc && styles.locationChipSelected]}
+                style={[
+                  styles.locationChip,
+                  lesionLocation === loc && styles.locationChipSelected,
+                ]}
                 onPress={() => setLesionLocation(loc)}
-                activeOpacity={0.75}>
+                activeOpacity={0.75}
+              >
                 <Text
                   style={[
                     styles.locationChipText,
                     lesionLocation === loc && styles.locationChipTextSelected,
-                  ]}>
+                  ]}
+                >
                   {loc}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+          <TouchableOpacity
+            onPress={() => setMoreLocations(!moreLocations)}
+            style={{ paddingTop: 12 }}
+          >
+            <Text style={{ color: Colors.primary }}>
+              {moreLocations ? 'Fewer locations' : 'Other locations'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.noteCard}>
           <Text style={styles.noteText}>
-            This information helps the AI model provide more accurate preliminary
-            screening results by considering demographic and anatomical factors.
+            This information is saved with this screening for context. The AI
+            prediction is based on the lesion image and is not a medical
+            diagnosis.
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.continueBtn} onPress={handleContinue} activeOpacity={0.85}>
+        {missing.length > 0 && (
+          <Text
+            accessibilityRole="alert"
+            style={{ color: Colors.textSecondary, marginBottom: 8 }}
+          >
+            {missing.join(' · ')}
+          </Text>
+        )}
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: missing.length > 0 }}
+          disabled={missing.length > 0}
+          style={[styles.continueBtn, missing.length > 0 && { opacity: 0.5 }]}
+          onPress={handleContinue}
+          activeOpacity={0.85}
+        >
           <Text style={styles.continueBtnText}>Continue</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   topBar: {
-    paddingTop: Spacing.xxxl,
+    paddingTop: Spacing.md,
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.sm,
   },
@@ -244,7 +350,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: Typography.sm,
     fontWeight: Typography.semiBold,
-    color: Colors.textPrimary,
+    color: Colors.primary,
   },
   input: {
     backgroundColor: Colors.surface,

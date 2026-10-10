@@ -1,5 +1,8 @@
 /** Runs the bundled lesion-segmentation model entirely on the device. */
-import { loadTensorflowModel, type TfliteModel } from 'react-native-fast-tflite';
+import {
+  loadTensorflowModel,
+  type TfliteModel,
+} from 'react-native-fast-tflite';
 import RNFS from 'react-native-fs';
 import { Platform } from 'react-native';
 import {
@@ -40,7 +43,10 @@ async function getModel(): Promise<TfliteModel> {
     if (!(await RNFS.exists(cachedPath))) {
       await RNFS.copyFileAssets(MODEL_FILENAME, cachedPath);
     }
-    cachedModel = await loadTensorflowModel({ url: `file://${cachedPath}` }, []);
+    cachedModel = await loadTensorflowModel(
+      { url: `file://${cachedPath}` },
+      [],
+    );
     return cachedModel;
   }
 
@@ -51,18 +57,24 @@ async function getModel(): Promise<TfliteModel> {
   return cachedModel;
 }
 
-export async function segmentLesion(source: ImageSource): Promise<SegmentationResult> {
+export async function segmentLesion(
+  source: ImageSource,
+): Promise<SegmentationResult> {
   const model = await getModel();
   const rgb = await loadResizedImageRgb(source, MODEL_SIZE);
   const input = new Float32Array(MODEL_INPUT_ELEMENTS);
 
   // The float model has no preprocessing operation in its graph, so supply the
   // standard normalized RGB range used during image-model training.
-  for (let index = 0; index < MODEL_INPUT_ELEMENTS; index += 1) input[index] = rgb[index] / 255;
+  for (let index = 0; index < MODEL_INPUT_ELEMENTS; index += 1)
+    input[index] = rgb[index] / 255;
 
   const [output] = await model.run([input.buffer]);
   const mask = new Float32Array(output);
-  if (mask.length !== MASK_PIXELS || mask.some(value => !Number.isFinite(value))) {
+  if (
+    mask.length !== MASK_PIXELS ||
+    mask.some(value => !Number.isFinite(value))
+  ) {
     throw new Error(`Unexpected segmentation mask size: ${mask.length}.`);
   }
 
@@ -92,7 +104,10 @@ export async function segmentLesion(source: ImageSource): Promise<SegmentationRe
   if (lesionDetected) {
     // Preserve surrounding skin: add 20% of the longest lesion dimension,
     // with a small minimum margin for compact lesions.
-    const margin = Math.max(12, Math.ceil(Math.max(right - left + 1, bottom - top + 1) * 0.2));
+    const margin = Math.max(
+      12,
+      Math.ceil(Math.max(right - left + 1, bottom - top + 1) * 0.2),
+    );
     bounds = {
       left: Math.max(0, (left - margin) / MODEL_SIZE),
       top: Math.max(0, (top - margin) / MODEL_SIZE),
@@ -109,8 +124,16 @@ export async function segmentLesion(source: ImageSource): Promise<SegmentationRe
 }
 
 /** Segments the lesion and materializes its automatically selected AOI. */
-export async function createAutomaticAreaOfInterest(source: ImageSource): Promise<AreaOfInterestResult> {
+export async function createAutomaticAreaOfInterest(
+  source: ImageSource,
+): Promise<AreaOfInterestResult> {
   const segmentation = await segmentLesion(source);
   if (!segmentation.bounds) return { segmentation };
-  return { segmentation, image: await cropImageToJpeg(source, segmentation.bounds) };
+  return {
+    segmentation,
+    image: await cropImageToJpeg(source, segmentation.bounds, {
+      square: true,
+      minimumSide: 224,
+    }),
+  };
 }

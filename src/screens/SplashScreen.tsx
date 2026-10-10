@@ -6,38 +6,54 @@ import { Colors, Typography, Spacing } from '../theme';
 import { hasCompletedFirstRun } from '../database/database';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Splash'>;
+  navigation?: NativeStackNavigationProp<RootStackParamList, 'Splash'>;
+  onFinished?: () => void;
 };
 
-export const SplashScreen: React.FC<Props> = ({ navigation }) => {
+export const SplashScreen: React.FC<Props> = ({ navigation, onFinished }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.88)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, tension: 55, friction: 9, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 55,
+        friction: 9,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     let mounted = true;
     const timer = setTimeout(async () => {
+      if (onFinished) {
+        onFinished();
+        return;
+      }
       const completed = await hasCompletedFirstRun();
       if (!mounted) return;
-      navigation.replace(completed ? 'MainTabs' : 'Onboarding');
-    }, 2600);
+      navigation?.replace(completed ? 'MainTabs' : 'Onboarding');
+    }, 1200);
     return () => {
       mounted = false;
       clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fadeAnim, scaleAnim, navigation, onFinished]);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
       <Animated.View
-        style={[styles.content, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-
+        style={[
+          styles.content,
+          { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+        ]}
+      >
         {/* Outer ring */}
         <View style={styles.outerRing}>
           {/* Teal circle with scan icon */}
@@ -53,7 +69,9 @@ export const SplashScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <Text style={styles.appName}>DermaSight</Text>
-        <Text style={styles.subtitle}>AI-Assisted Pigmented Skin Lesion Screening</Text>
+        <Text style={styles.subtitle}>
+          AI-Assisted Pigmented Skin Lesion Screening
+        </Text>
 
         {/* Loading dots */}
         <View style={styles.dots}>
@@ -108,10 +126,34 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
     borderWidth: 2.5,
   },
-  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 2 },
-  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 2 },
-  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 2 },
-  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 2 },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 2,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 2,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 2,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 2,
+  },
   appName: {
     fontSize: Typography.xxl,
     fontWeight: Typography.bold,

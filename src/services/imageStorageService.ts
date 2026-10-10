@@ -5,8 +5,9 @@
  */
 
 import RNFS from 'react-native-fs';
+import { secureId } from '../utils/secureId';
 
-const IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/dermasight_images`;
+const IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/skinsense_images`;
 
 /** Ensure the images directory exists */
 export async function ensureImageDirectory(): Promise<void> {
@@ -25,8 +26,11 @@ export async function ensureImageDirectory(): Promise<void> {
 export async function saveImageLocally(sourceUri: string): Promise<string> {
   await ensureImageDirectory();
 
-  const timestamp = Date.now();
-  const extension = sourceUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const timestamp = secureId();
+  const candidate = sourceUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const extension = ['jpg', 'jpeg', 'png', 'heic', 'heif'].includes(candidate)
+    ? candidate
+    : 'jpg';
   const fileName = `lesion_${timestamp}.${extension}`;
   const destPath = `${IMAGE_DIR}/${fileName}`;
 
@@ -37,9 +41,9 @@ export async function saveImageLocally(sourceUri: string): Promise<string> {
 
   const exists = await RNFS.exists(cleanSource);
   if (!exists) {
-    console.warn(`Source image does not exist (likely deleted by hot reload): ${cleanSource}`);
-    // If the file is gone, return an empty string rather than crashing the save process
-    return '';
+    throw new Error(
+      'The image is no longer available. Please capture or select it again.',
+    );
   }
 
   await RNFS.copyFile(cleanSource, destPath);
@@ -58,7 +62,7 @@ export async function deleteLocalImage(imagePath: string): Promise<void> {
     }
   } catch {
     // Non-critical: log and continue if deletion fails
-    console.warn('Could not delete image:', imagePath);
+    console.warn('Could not delete a local screening image.');
   }
 }
 

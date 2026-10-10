@@ -11,7 +11,6 @@ import { getPreprocessedResult } from './preprocessingService';
 import {
   ClassificationResult,
   LesionClass,
-  ScreeningStatus,
   SelectedSymptoms,
   ThresholdStatus,
 } from '../types';
@@ -42,7 +41,8 @@ async function getModel(): Promise<TfliteModel> {
   try {
     if (Platform.OS === 'android') {
       const modelFilename = 'efficientnet_ham10000.tflite';
-      const targetPath = `${RNFS.CachesDirectoryPath}/${modelFilename}`;
+      // Version the cache so existing Android installs load the updated model.
+      const targetPath = `${RNFS.CachesDirectoryPath}/efficientnet_ham10000-20383b0.tflite`;
       const exists = await RNFS.exists(targetPath);
       if (!exists) {
         try {

@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 import * as jpeg from 'jpeg-js';
 import RNFS from 'react-native-fs';
+import { expandToSquareCrop } from './roiGeometry';
 
 export interface ImageMetadata {
   width?: number;
@@ -40,6 +41,12 @@ export interface QualityAssessment {
   checks: QualityCheck[];
   overallStatus: 'pass' | 'warn';
   summary: string;
+  metrics: {
+    brightness: number;
+    sharpness: number;
+    width: number;
+    height: number;
+  };
 }
 
 const DEFAULT_IMAGE_SIZE = 224;
@@ -48,7 +55,11 @@ function stripDataPrefix(base64: string): string {
   return base64.includes(',') ? base64.split(',').pop() ?? base64 : base64;
 }
 
-function decodeRgbFromJpeg(buffer: Buffer): { width: number; height: number; rgb: Uint8Array } {
+function decodeRgbFromJpeg(buffer: Buffer): {
+  width: number;
+  height: number;
+  rgb: Uint8Array;
+} {
   const decoded = jpeg.decode(buffer, { useTArray: true, formatAsRGBA: true });
   if (!decoded?.data?.length) {
     throw new Error('Could not decode JPEG pixels.');
@@ -64,12 +75,19 @@ function decodeRgbFromJpeg(buffer: Buffer): { width: number; height: number; rgb
   return { width: decoded.width, height: decoded.height, rgb };
 }
 
-async function decodeSource(source: ImageSource): Promise<{ width: number; height: number; rgb: Uint8Array }> {
-  const base64 = source.base64 ?? (
-    source.filePath
-      ? await RNFS.readFile(source.filePath.startsWith('file://') ? source.filePath.slice(7) : source.filePath, 'base64')
-      : undefined
-  );
+async function decodeSource(
+  source: ImageSource,
+): Promise<{ width: number; height: number; rgb: Uint8Array }> {
+  const base64 =
+    source.base64 ??
+    (source.filePath
+      ? await RNFS.readFile(
+          source.filePath.startsWith('file://')
+            ? source.filePath.slice(7)
+            : source.filePath,
+          'base64',
+        )
+      : undefined);
   if (!base64) {
     throw new Error('No image payload available for decoding.');
   }
@@ -116,9 +134,9 @@ function bilinearResize(
       for (let c = 0; c < 3; c++) {
         dst[dstIdx + c] = Math.round(
           srcData[idx00 + c] * w00 +
-          srcData[idx10 + c] * w10 +
-          srcData[idx01 + c] * w01 +
-          srcData[idx11 + c] * w11,
+            srcData[idx10 + c] * w10 +
+            srcData[idx01 + c] * w01 +
+            srcData[idx11 + c] * w11,
         );
       }
     }
@@ -139,24 +157,61 @@ export async function loadResizedImageRgb(
 export async function cropImageToJpeg(
   source: ImageSource,
   bounds: NormalizedCrop,
+  options?: { square: boolean; minimumSide?: number },
 ): Promise<CroppedImage> {
-  const base64 = source.base64 ?? (
-    source.filePath
-      ? await RNFS.readFile(source.filePath.startsWith('file://') ? source.filePath.slice(7) : source.filePath, 'base64')
-      : undefined
-  );
+  const base64 =
+    source.base64 ??
+    (source.filePath
+      ? await RNFS.readFile(
+          source.filePath.startsWith('file://')
+            ? source.filePath.slice(7)
+            : source.filePath,
+          'base64',
+        )
+      : undefined);
   if (!base64) throw new Error('No image payload available for AOI crop.');
 
   const decoded = jpeg.decode(Buffer.from(stripDataPrefix(base64), 'base64'), {
     useTArray: true,
     formatAsRGBA: true,
   });
-  if (!decoded?.data?.length) throw new Error('Could not decode image for AOI crop.');
+  if (!decoded?.data?.length)
+    throw new Error('Could not decode image for AOI crop.');
 
-  const left = Math.max(0, Math.min(decoded.width - 1, Math.floor(bounds.left * decoded.width)));
-  const top = Math.max(0, Math.min(decoded.height - 1, Math.floor(bounds.top * decoded.height)));
-  const right = Math.max(left + 1, Math.min(decoded.width, Math.ceil(bounds.right * decoded.width)));
-  const bottom = Math.max(top + 1, Math.min(decoded.height, Math.ceil(bounds.bottom * decoded.height)));
+  const square = options?.square
+    ? expandToSquareCrop(
+        bounds,
+        decoded.width,
+        decoded.height,
+        options.minimumSide,
+      )
+    : undefined;
+  if (options?.square && !square)
+    throw new Error('The lesion region cannot fit inside a square crop.');
+  const left =
+    square?.left ??
+    Math.max(
+      0,
+      Math.min(decoded.width - 1, Math.floor(bounds.left * decoded.width)),
+    );
+  const top =
+    square?.top ??
+    Math.max(
+      0,
+      Math.min(decoded.height - 1, Math.floor(bounds.top * decoded.height)),
+    );
+  const right =
+    square?.right ??
+    Math.max(
+      left + 1,
+      Math.min(decoded.width, Math.ceil(bounds.right * decoded.width)),
+    );
+  const bottom =
+    square?.bottom ??
+    Math.max(
+      top + 1,
+      Math.min(decoded.height, Math.ceil(bounds.bottom * decoded.height)),
+    );
   const width = right - left;
   const height = bottom - top;
   const data = Buffer.alloc(width * height * 4);
@@ -168,14 +223,24 @@ export async function cropImageToJpeg(
   const encoded = jpeg.encode({ data, width, height }, 92).data;
   const path = `${RNFS.CachesDirectoryPath}/lesion-aoi-${Date.now()}.jpg`;
   await RNFS.writeFile(path, encoded.toString('base64'), 'base64');
-  return { uri: `file://${path}`, path, width, height, fileSize: encoded.length };
+  return {
+    uri: `file://${path}`,
+    path,
+    width,
+    height,
+    fileSize: encoded.length,
+  };
 }
 
 function luminance(r: number, g: number, b: number): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-function analyzeBrightness(rgb: Uint8Array): { mean: number; min: number; max: number } {
+function analyzeBrightness(rgb: Uint8Array): {
+  mean: number;
+  min: number;
+  max: number;
+} {
   let total = 0;
   let min = 255;
   let max = 0;
@@ -194,12 +259,20 @@ function analyzeBrightness(rgb: Uint8Array): { mean: number; min: number; max: n
   };
 }
 
-function analyzeSharpness(rgb: Uint8Array, width: number, height: number): number {
+function analyzeSharpness(
+  rgb: Uint8Array,
+  width: number,
+  height: number,
+): number {
   const intensities = new Float32Array(width * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 3;
-      intensities[y * width + x] = luminance(rgb[idx], rgb[idx + 1], rgb[idx + 2]);
+      intensities[y * width + x] = luminance(
+        rgb[idx],
+        rgb[idx + 1],
+        rgb[idx + 2],
+      );
     }
   }
 
@@ -232,7 +305,8 @@ export async function assessImageQuality(
   const sourcePixels = Math.max(1, sourceWidth * sourceHeight);
   const bytesPerPixel = (metadata.fileSize ?? 0) / sourcePixels;
 
-  const resolutionPass = sourceWidth >= DEFAULT_IMAGE_SIZE && sourceHeight >= DEFAULT_IMAGE_SIZE;
+  const resolutionPass =
+    sourceWidth >= DEFAULT_IMAGE_SIZE && sourceHeight >= DEFAULT_IMAGE_SIZE;
   const brightnessPass = brightness.mean >= 65 && brightness.mean <= 205;
   const sharpnessPass = sharpness >= 10 || bytesPerPixel >= 0.12;
 
@@ -250,25 +324,37 @@ export async function assessImageQuality(
       label: 'Lighting estimate',
       status: brightnessPass ? 'pass' : 'warn',
       detail: brightnessPass
-        ? `Estimated average brightness is ${brightness.mean.toFixed(0)} / 255, within the recommended range.`
+        ? `Estimated average brightness is ${brightness.mean.toFixed(
+            0,
+          )} / 255, within the recommended range.`
         : brightness.mean < 65
-          ? `Estimated average brightness is ${brightness.mean.toFixed(0)} / 255, suggesting the image may be underexposed.`
-          : `Estimated average brightness is ${brightness.mean.toFixed(0)} / 255, suggesting the image may be overexposed.`,
+        ? `Estimated average brightness is ${brightness.mean.toFixed(
+            0,
+          )} / 255, suggesting the image may be underexposed.`
+        : `Estimated average brightness is ${brightness.mean.toFixed(
+            0,
+          )} / 255, suggesting the image may be overexposed.`,
     },
     {
       id: 'sharpness',
       label: 'Sharpness estimate',
       status: sharpnessPass ? 'pass' : 'warn',
       detail: sharpnessPass
-        ? `Estimated edge contrast score is ${sharpness.toFixed(1)}, consistent with acceptable detail.`
-        : `Estimated edge contrast score is ${sharpness.toFixed(1)}, which may indicate blur or heavy compression.`,
+        ? `Estimated edge contrast score is ${sharpness.toFixed(
+            1,
+          )}, consistent with acceptable detail.`
+        : `Estimated edge contrast score is ${sharpness.toFixed(
+            1,
+          )}, which may indicate blur or heavy compression.`,
     },
     {
       id: 'compressed',
       label: 'File compression is acceptable',
       status: bytesPerPixel >= 0.12 ? 'pass' : 'info',
       detail: metadata.fileSize
-        ? `File size is ${Math.round(metadata.fileSize / 1024)} KB, about ${bytesPerPixel.toFixed(2)} bytes per source pixel.`
+        ? `File size is ${Math.round(
+            metadata.fileSize / 1024,
+          )} KB, about ${bytesPerPixel.toFixed(2)} bytes per source pixel.`
         : 'File size was not available, so compression quality could not be estimated.',
     },
   ];
@@ -276,6 +362,12 @@ export async function assessImageQuality(
   const failedChecks = checks.filter(check => check.status === 'warn').length;
   return {
     checks,
+    metrics: {
+      brightness: brightness.mean,
+      sharpness,
+      width: sourceWidth,
+      height: sourceHeight,
+    },
     overallStatus: failedChecks > 0 ? 'warn' : 'pass',
     summary:
       failedChecks > 0

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DermaSight Accounts</title>
+    <style>
+      body {
+        font: 16px system-ui, sans-serif;
+        background: #f0f7f8;
+        color: #19383c;
+        margin: 0;
+        padding: 32px;
+      }
+      main {
+        max-width: 1200px;
+        margin: auto;
+      }
+      h1 {
+        color: #087b80;
+        margin-bottom: 6px;
+      }
+      p {
+        line-height: 1.6;
+        color: #526a70;
+      }
+      .panel {
+        background: white;
+        padding: 24px;
+        border: 1px solid #d2e4e6;
+        border-radius: 18px;
+        margin-top: 24px;
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+      }
+      th,
+      td {
+        padding: 14px 10px;
+        border-bottom: 1px solid #e5eeee;
+      }
+      th {
+        font-size: 13px;
+        color: #60757b;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        border: 1px solid #b8d4d8;
+        border-radius: 8px;
+        padding: 9px;
+      }
+      input {
+        max-width: 180px;
+      }
+      button {
+        background: #087f86;
+        color: white;
+        cursor: pointer;
+        margin: 3px;
+      }
+      button.delete {
+        color: #b92336;
+        background: #fff2f2;
+        border-color: #eebdc5;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      small {
+        color: #788e94;
+      }
+      .status {
+        min-height: 24px;
+        color: #087b80;
+        overflow-wrap: anywhere;
+      }
+      .error {
+        color: #b92336;
+      }
+      .notice {
+        border-left: 4px solid #0e9aa5;
+        padding-left: 16px;
+      }
+      @media (max-width: 800px) {
+        body { padding: 20px; }
+        .panel { padding: 16px; }
+        table, tbody, tr, td { display: block; }
+        thead { display: none; }
+        tr { padding: 12px 0; border-bottom: 1px solid #d2e4e6; }
+        tr:last-child { border-bottom: 0; }
+        td { border: 0; padding: 8px 0; overflow-wrap: anywhere; }
+        td::before {
+          content: attr(data-label);
+          display: block;
+          color: #60757b;
+          font-size: 13px;
+          margin-bottom: 5px;
+        }
+        input { max-width: none; width: 100%; box-sizing: border-box; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>DermaSight account manager</h1>
+      <p>Local access on this Mac · registered accounts</p>
+      <p class="notice">
+        Edit account names and sex, or delete test accounts before registering
+        again. Sign out on the phone before deleting an account. A recreated
+        account receives a new ID; its previous scans remain on the phone under
+        the old ID. Each deletion creates a database backup in
+        <strong>backend/data</strong>.
+      </p>
+      <button id="refresh">Refresh accounts</button>
+      <p id="status" class="status" role="status"></p>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Email / Account ID</th>
+              <th>Full name</th>
+              <th>Sex</th>
+              <th>Sign-in methods</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="accounts"></tbody>
+        </table>
+      </div>
+      <p>
+        Profile edits appear after the app reloads its account profile. Email
+        and credential changes are handled by authentication flows, not direct
+        row edits. Password hashes, Google identity subjects, and session tokens
+        are never displayed here.
+      </p>
+    </main>
+    <script nonce="__NONCE__">
+      const csrf = '__CSRF__';
+      const status = document.querySelector('#status');
+      const table = document.querySelector('#accounts');
+      let pending = false;
+      function notice(message, error = false) {
+        status.textContent = message;
+        status.classList.toggle('error', error);
+      }
+      function element(tag, text) {
+        const node = document.createElement(tag);
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+      async function request(path, method = 'GET', data) {
+        const response = await fetch(path, {
+          method,
+          headers: {
+            'X-Admin-Token': csrf,
+            'Content-Type': 'application/json',
+          },
+          ...(data ? { body: JSON.stringify(data) } : {}),
+        });
+        const value = await response.json();
+        if (!response.ok) throw new Error(value.message || 'Request failed');
+        return value;
+      }
+      async function mutate(action) {
+        if (pending) return;
+        pending = true;
+        document
+          .querySelectorAll('button')
+          .forEach(button => (button.disabled = true));
+        try {
+          await action();
+        } catch (error) {
+          notice(error.message, true);
+        } finally {
+          pending = false;
+          document
+            .querySelectorAll('button')
+            .forEach(button => (button.disabled = false));
+        }
+      }
+      async function load() {
+        const { accounts } = await request('/api/accounts');
+        table.replaceChildren();
+        for (const user of accounts) {
+          const row = element('tr');
+          const identity = element('td');
+          identity.append(
+            element('div', user.email),
+            element('small', user.id),
+          );
+          const name = element('input');
+          name.value = user.name;
+          name.maxLength = 100;
+          name.setAttribute('aria-label', 'Full name for ' + user.email);
+          const sex = element('select');
+          sex.setAttribute('aria-label', 'Sex for ' + user.email);
+          for (const value of ['Male', 'Female', 'Other']) {
+            const option = element('option', value);
+            option.value = value;
+            sex.append(option);
+          }
+          sex.value = user.sex;
+          const nameCell = element('td');
+          nameCell.append(name);
+          const sexCell = element('td');
+          sexCell.append(sex);
+          const methods = element(
+            'td',
+            (user.authenticationMethods || []).join(' + '),
+          );
+          const actions = element('td');
+          const save = element('button', 'Save');
+          save.onclick = () =>
+            mutate(async () => {
+              await request('/api/account', 'PATCH', {
+                id: user.id,
+                name: name.value,
+                sex: sex.value,
+              });
+              await load();
+              notice('Profile saved. Reload the account profile in the app.');
+            });
+          const remove = element('button', 'Delete');
+          remove.className = 'delete';
+          remove.onclick = () => {
+            if (
+              !confirm(
+                'Delete ' +
+                  user.email +
+                  ' and revoke its login sessions? A backup will be saved. Old phone scans will not transfer to a recreated account.',
+              )
+            )
+              return;
+            mutate(async () => {
+              const result = await request('/api/account', 'DELETE', {
+                id: user.id,
+              });
+              await load();
+              notice('Account deleted. Backup: ' + result.backup);
+            });
+          };
+          actions.append(save, remove);
+          [identity, nameCell, sexCell, methods, actions].forEach((cell, index) => {
+            cell.dataset.label = ['Email / Account ID', 'Full name', 'Sex', 'Sign-in methods', 'Actions'][index];
+          });
+          row.append(identity, nameCell, sexCell, methods, actions);
+          table.append(row);
+        }
+        return accounts.length;
+      }
+      document.querySelector('#refresh').onclick = () =>
+        mutate(async () => notice((await load()) + ' accounts'));
+      mutate(async () => notice((await load()) + ' accounts'));
+    </script>
+  </body>
+</html>

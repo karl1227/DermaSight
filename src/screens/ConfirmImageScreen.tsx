@@ -16,8 +16,10 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
-import { assessImageQuality, type CroppedImage, type QualityCheck } from '../services/imageProcessingService';
-import { createAutomaticAreaOfInterest, type SegmentationResult } from '../services/segmentationService';
+import {
+  prepareCapture,
+  type PreparedCapture,
+} from '../services/capturePreparationService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ConfirmImage'>;
@@ -28,82 +30,72 @@ const { width } = Dimensions.get('window');
 const IMAGE_SIZE = width - Spacing.xl * 2;
 
 export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType, imageMeta } = route.params;
-  const [qualityChecks, setQualityChecks] = React.useState<QualityCheck[]>([]);
-  const [qualitySummary, setQualitySummary] = React.useState('Assessing image quality...');
-  const [isAssessing, setIsAssessing] = React.useState(true);
-  const [segmentation, setSegmentation] = React.useState<SegmentationResult | null>(null);
-  const [segmentationError, setSegmentationError] = React.useState(false);
-  const [isSelectingAoi, setIsSelectingAoi] = React.useState(true);
-  const [aoiImage, setAoiImage] = React.useState<CroppedImage | null>(null);
-  const [viewMode, setViewMode] = React.useState<'highlight' | 'crop'>('highlight');
+  const {
+    patientInfo,
+    symptoms,
+    imageUri,
+    imagePath,
+    imageData,
+    imageType,
+    imageMeta,
+    imageEntry,
+  } = route.params;
+  const [prepared, setPrepared] = React.useState<PreparedCapture | null>(null);
+  const [stage, setStage] = React.useState('Preparing image');
+  const [error, setError] = React.useState<string | null>(null);
+  const [attempt, setAttempt] = React.useState(0);
+  const [isPreparing, setIsPreparing] = React.useState(true);
+  const [zoom, setZoom] = React.useState(1);
+  const [viewMode, setViewMode] = React.useState<'crop' | 'highlight'>('crop');
 
   React.useEffect(() => {
-    let isMounted = true;
+    let active = true;
+    setIsPreparing(true);
+    setPrepared(null);
+    setError(null);
     const interaction = InteractionManager.runAfterInteractions(() => {
-      assessImageQuality(
+      prepareCapture(
         {
           base64: imageData,
           mimeType: imageType,
           filePath: imagePath ?? imageUri,
         },
         imageMeta,
+        value => {
+          if (active) setStage(value);
+        },
+        () => !active,
+        zoom,
       )
-        .then(result => {
-          if (!isMounted) return;
-          setQualityChecks(result.checks);
-          setQualitySummary(result.summary);
+        .then(value => {
+          if (active) setPrepared(value);
         })
-        .catch(() => {
-          if (!isMounted) return;
-          setQualityChecks([
-            {
-              id: 'quality-error',
-              label: 'Image quality check unavailable',
-              status: 'info',
-              detail: 'The image could not be analyzed automatically, but you can still continue if it looks clear.',
-            },
-          ]);
-          setQualitySummary('Automatic quality analysis could not be completed.');
+        .catch(reason => {
+          if (active)
+            setError(
+              reason instanceof Error
+                ? reason.message
+                : 'Image checking failed. Please retake the photo.',
+            );
         })
         .finally(() => {
-          if (isMounted) setIsAssessing(false);
-        });
-
-      createAutomaticAreaOfInterest({
-        base64: imageData,
-        mimeType: imageType,
-        filePath: imagePath ?? imageUri,
-      })
-        .then(result => {
-          if (!isMounted) return;
-          setSegmentation(result.segmentation);
-          setAoiImage(result.image ?? null);
-        })
-        .catch(() => {
-          if (isMounted) setSegmentationError(true);
-        })
-        .finally(() => {
-          if (isMounted) setIsSelectingAoi(false);
+          if (active) setIsPreparing(false);
         });
     });
-
     return () => {
-      isMounted = false;
+      active = false;
       interaction.cancel();
     };
-  }, [imageData, imageMeta, imagePath, imageType, imageUri]);
+  }, [imageData, imageMeta, imagePath, imageType, imageUri, attempt, zoom]);
 
-  const warningChecks = qualityChecks.filter(check => check.status === 'warn');
-  const shouldSuggestRetake = !isAssessing && warningChecks.length > 0;
-  const canProceed = !isAssessing && !isSelectingAoi && qualityChecks.length > 0;
-  const retakeSuggestion = warningChecks.some(check => check.id === 'lighting')
-    ? warningChecks.some(check => check.id === 'sharpness')
-      ? 'Use brighter, even lighting and hold the phone steady while focusing on the lesion, then retake the photo.'
-      : 'Use the camera light or brighter, even lighting, then retake the photo for a clearer analysis.'
-    : warningChecks.some(check => check.id === 'sharpness')
-      ? 'Hold the phone steady, focus on the lesion, and retake the photo for clearer detail.'
-      : 'Retake the photo at a closer, well-lit resolution for a clearer analysis.';
+  const original = prepared?.originalImage;
+  const bounds = prepared?.lesionBounds;
+  const showOriginal = viewMode === 'highlight' && Boolean(original);
+  const fit = original
+    ? Math.min(IMAGE_SIZE / original.width, IMAGE_SIZE / original.height)
+    : 1;
+  const originalWidth = (original?.width ?? IMAGE_SIZE) * fit;
+  const originalHeight = (original?.height ?? IMAGE_SIZE) * fit;
 
   return (
     <View style={styles.container}>
@@ -112,159 +104,33 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>‹ Retake</Text>
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backText}>
+            {imageEntry === 'gallery' ? '‹ Back' : '‹ Retake'}
+          </Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Captured Image</Text>
+        <Text style={styles.headerTitle}>
+          {imageEntry === 'gallery'
+            ? 'Review Uploaded Image'
+            : 'Review Captured Image'}
+        </Text>
       </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
-        {/* Image preview with Lesion Highlight */}
-        <View style={styles.imageWrapper}>
-          <Image
-            source={{ uri: viewMode === 'crop' && aoiImage ? aoiImage.uri : imageUri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-
-          {/* Real-time calculated Lesion Highlight Overlay on the full photo */}
-          {viewMode === 'highlight' && segmentation?.bounds && segmentation.lesionDetected && (
-            <View
-              style={[
-                styles.highlightBox,
-                {
-                  left: `${segmentation.bounds.left * 100}%`,
-                  top: `${segmentation.bounds.top * 100}%`,
-                  width: `${(segmentation.bounds.right - segmentation.bounds.left) * 100}%`,
-                  height: `${(segmentation.bounds.bottom - segmentation.bounds.top) * 100}%`,
-                },
-              ]}>
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-              <View style={styles.highlightBadge}>
-                <Text style={styles.highlightBadgeText}>Detected Lesion</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.imageBadge}>
-            <Text style={styles.imageBadgeText}>
-              {viewMode === 'crop' && aoiImage ? 'Auto-Cropped AOI' : 'Full Capture'}
-            </Text>
-          </View>
-        </View>
-
-        {/* View Mode Toggle */}
-        {aoiImage && segmentation?.lesionDetected && (
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, viewMode === 'highlight' && styles.toggleBtnActive]}
-              onPress={() => setViewMode('highlight')}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.toggleBtnText,
-                  viewMode === 'highlight' && styles.toggleBtnTextActive,
-                ]}>
-                Highlight Frame
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, viewMode === 'crop' && styles.toggleBtnActive]}
-              onPress={() => setViewMode('crop')}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.toggleBtnText,
-                  viewMode === 'crop' && styles.toggleBtnTextActive,
-                ]}>
-                Cropped Area (AOI)
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.segmentationCard}>
-          <Text style={styles.segmentationTitle}>Lesion Segmentation</Text>
-          {segmentation ? (
-            <Text style={styles.segmentationText}>
-              {segmentation.lesionDetected
-                ? `A lesion region was identified and cropped automatically, covering about ${segmentation.coveragePercent}% of the original image.`
-                : 'No clear lesion region was identified. Center the lesion and retake the image if needed.'}
-            </Text>
-          ) : segmentationError ? (
-            <Text style={styles.segmentationText}>Segmentation was unavailable for this image. You can still continue with the quality review.</Text>
-          ) : (
-            <View style={styles.segmentationLoadingRow}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.segmentationText}>Finding the lesion region locally...</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Quality assessment */}
-        <View style={styles.qualityCard}>
-          <Text style={styles.qualityTitle}>Image Quality Assessment</Text>
-          <Text style={styles.qualitySummary}>{qualitySummary}</Text>
-          {isAssessing ? (
-            <View style={styles.qualityLoadingRow}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.qualityLoadingText}>Analyzing lighting, sharpness, and resolution...</Text>
-            </View>
-          ) : (
-            qualityChecks.map(item => (
-              <View key={item.id} style={styles.qualityItem}>
-                <View style={styles.qualityRow}>
-                  <Text style={styles.qualityLabel}>{item.label}</Text>
-                  <View
-                    style={[
-                      styles.qualityBadge,
-                      item.status === 'pass'
-                        ? styles.qualityPass
-                        : item.status === 'warn'
-                          ? styles.qualityWarn
-                          : styles.qualityInfo,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.qualityBadgeText,
-                        item.status === 'pass'
-                          ? styles.qualityPassText
-                          : item.status === 'warn'
-                            ? styles.qualityWarnText
-                            : styles.qualityInfoText,
-                      ]}>
-                      {item.status === 'pass' ? 'Good' : item.status === 'warn' ? 'Review' : 'Info'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.qualityDetail}>{item.detail}</Text>
-              </View>
-            ))
-          )}
-          {shouldSuggestRetake && (
-            <View style={styles.retakeSuggestion}>
-              <Text style={styles.retakeSuggestionTitle}>Suggestion: Retake this image</Text>
-              <Text style={styles.retakeSuggestionText}>{retakeSuggestion}</Text>
-            </View>
-          )}
-        </View>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Patient info */}
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Patient & Scan Info</Text>
+          <Text style={styles.infoTitle}>Patient Information</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Patient</Text>
             <Text style={styles.infoValue}>{patientInfo.fullName}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>ID</Text>
+            <Text style={styles.infoLabel}>Screening ID</Text>
             <Text style={styles.infoValue}>{patientInfo.patientId}</Text>
           </View>
           <View style={styles.infoRow}>
@@ -273,27 +139,135 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </View>
 
+        {/* Image preview; quality and automatic cropping still run locally. */}
+        <View style={styles.imageWrapper}>
+          <Image
+            source={{
+              uri: showOriginal
+                ? original!.uri
+                : prepared?.image.uri ?? imageUri,
+            }}
+            style={styles.image}
+            resizeMode="contain"
+          />
+          {showOriginal && bounds && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.lesionHighlight,
+                {
+                  left:
+                    (IMAGE_SIZE - originalWidth) / 2 +
+                    bounds.left * originalWidth,
+                  top:
+                    (IMAGE_SIZE - originalHeight) / 2 +
+                    bounds.top * originalHeight,
+                  width: (bounds.right - bounds.left) * originalWidth,
+                  height: (bounds.bottom - bounds.top) * originalHeight,
+                },
+              ]}
+            />
+          )}
+          {isPreparing && (
+            <View
+              style={styles.loadingOverlay}
+              accessibilityRole="progressbar"
+              accessibilityLabel="Checking image"
+            >
+              <ActivityIndicator size="large" color={Colors.white} />
+            </View>
+          )}
+        </View>
+
+        {prepared?.cropped && original && !isPreparing && (
+          <View style={styles.previewModes}>
+            <AppButton
+              label={bounds ? 'Lesion Highlight' : 'Original Image'}
+              variant={showOriginal ? 'primary' : 'outline'}
+              size="sm"
+              fullWidth={false}
+              onPress={() => setViewMode('highlight')}
+            />
+            <AppButton
+              label="Selected ROI"
+              variant={showOriginal ? 'outline' : 'primary'}
+              size="sm"
+              fullWidth={false}
+              onPress={() => setViewMode('crop')}
+            />
+          </View>
+        )}
+
+        {isPreparing ? (
+          <Text style={styles.unavailableText} accessibilityLiveRegion="polite">
+            {stage}…
+          </Text>
+        ) : error ? (
+          <View style={styles.retakeSuggestion} accessibilityRole="alert">
+            <Text style={styles.retakeSuggestionText}>{error}</Text>
+          </View>
+        ) : null}
+
         {/* Action buttons */}
+        {prepared &&
+          prepared.validationMethod === 'appearance' &&
+          !isPreparing && (
+            <Text style={styles.unavailableText} accessibilityRole="alert">
+              Confirm that the preview shows skin and the intended lesion before
+              analyzing it.
+            </Text>
+          )}
+        {prepared && !isPreparing && (
+          <View style={styles.zoomControls}>
+            <AppButton
+              label="Zoom Out"
+              variant="outline"
+              fullWidth={false}
+              disabled={zoom <= 1}
+              onPress={() => setZoom(value => Math.max(1, value - 0.25))}
+            />
+            <AppButton
+              label="Zoom In"
+              variant="outline"
+              fullWidth={false}
+              disabled={zoom + 0.25 > prepared.maxZoom}
+              onPress={() => setZoom(value => value + 0.25)}
+            />
+          </View>
+        )}
         <AppButton
-          label={isAssessing || isSelectingAoi ? 'Preparing Area of Interest...' : 'Proceed to Preprocessing →'}
-          onPress={() =>
-            navigation.navigate('ImagePreprocessing', {
+          label="Analyze Image"
+          onPress={() => {
+            if (!prepared || isPreparing || error) return;
+            navigation.replace('AIClassification', {
               patientInfo,
               symptoms,
-              imageUri: aoiImage?.uri ?? imageUri,
-              imagePath: aoiImage?.path ?? imagePath,
-              imageData: aoiImage ? undefined : imageData,
-              imageType: aoiImage ? 'image/jpeg' : imageType,
-            })
-          }
+              imageUri: prepared.image.uri,
+              imagePath: prepared.image.path,
+              imageType: 'image/jpeg',
+              preprocessingId: prepared.preprocessing.id,
+            });
+          }}
           size="lg"
-          disabled={!canProceed}
-          loading={isAssessing || isSelectingAoi}
+          disabled={!prepared || isPreparing || Boolean(error)}
+          loading={isPreparing}
           style={styles.proceedBtn}
         />
+        {error && (
+          <AppButton
+            label="Retry Check"
+            onPress={() => setAttempt(value => value + 1)}
+            variant="outline"
+            style={styles.proceedBtn}
+          />
+        )}
 
         <AppButton
-          label={shouldSuggestRetake ? 'Retake for Better Lighting' : 'Retake Image'}
+          label={
+            imageEntry === 'gallery'
+              ? 'Back to Camera / Gallery'
+              : 'Retake Image'
+          }
           onPress={() => navigation.goBack()}
           variant="outline"
           size="lg"
@@ -338,121 +312,29 @@ const styles = StyleSheet.create({
     height: IMAGE_SIZE,
     borderRadius: Radius.xl,
   },
-  imageBadge: {
+  loadingOverlay: {
     position: 'absolute',
-    top: Spacing.md,
-    right: Spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  imageBadgeText: {
-    fontSize: Typography.xs,
-    color: Colors.white,
-    fontWeight: Typography.semiBold,
-  },
-  segmentationCard: {
-    backgroundColor: Colors.primaryUltraLight,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-    padding: Spacing.base,
+  unavailableText: {
+    fontSize: Typography.sm,
+    color: Colors.textSecondary,
     marginBottom: Spacing.base,
-  },
-  segmentationTitle: {
-    fontSize: Typography.base,
-    fontWeight: Typography.bold,
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  segmentationText: {
-    flex: 1,
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    lineHeight: Typography.sm * 1.45,
-  },
-  segmentationLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  qualityCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    marginBottom: Spacing.base,
-    ...Shadow.card,
-  },
-  qualityTitle: {
-    fontSize: Typography.base,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-  },
-  qualitySummary: {
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    lineHeight: Typography.sm * 1.45,
-  },
-  qualityLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-  },
-  qualityLoadingText: {
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    flex: 1,
-  },
-  qualityItem: {
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  qualityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  qualityLabel: {
-    flex: 1,
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    fontWeight: Typography.medium,
-  },
-  qualityBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 3,
-    borderRadius: Radius.pill,
-  },
-  qualityPass: { backgroundColor: Colors.successLight },
-  qualityWarn: { backgroundColor: 'rgba(245, 158, 11, 0.16)' },
-  qualityInfo: { backgroundColor: Colors.primaryUltraLight },
-  qualityBadgeText: { fontSize: Typography.xs, fontWeight: Typography.semiBold },
-  qualityPassText: { color: Colors.success },
-  qualityWarnText: { color: '#B45309' },
-  qualityInfoText: { color: Colors.primary },
-  qualityDetail: {
-    marginTop: 4,
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
-    lineHeight: Typography.xs * 1.45,
+    lineHeight: 20,
   },
   retakeSuggestion: {
-    marginTop: Spacing.md,
+    marginBottom: Spacing.base,
     padding: Spacing.md,
     borderRadius: Radius.md,
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.32)',
-  },
-  retakeSuggestionTitle: {
-    fontSize: Typography.sm,
-    fontWeight: Typography.bold,
-    color: '#92400E',
-    marginBottom: 4,
   },
   retakeSuggestionText: {
     fontSize: Typography.xs,
@@ -479,92 +361,36 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
-  infoLabel: { fontSize: Typography.sm, color: Colors.textMuted },
+  infoLabel: {
+    fontSize: Typography.sm,
+    color: Colors.textMuted,
+    marginRight: Spacing.md,
+  },
   infoValue: {
+    flex: 1,
+    textAlign: 'right',
     fontSize: Typography.sm,
     fontWeight: Typography.semiBold,
     color: Colors.textPrimary,
   },
-  highlightBox: {
+  proceedBtn: { marginBottom: Spacing.md },
+  lesionHighlight: {
     position: 'absolute',
-    borderColor: Colors.accent,
     borderWidth: 2,
+    borderColor: Colors.accent,
     backgroundColor: 'rgba(0, 201, 177, 0.15)',
-    borderRadius: Radius.md,
-  },
-  corner: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderColor: Colors.primary,
-  },
-  cornerTL: {
-    top: -2,
-    left: -2,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 4,
-  },
-  cornerTR: {
-    top: -2,
-    right: -2,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 4,
-  },
-  cornerBL: {
-    bottom: -2,
-    left: -2,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 4,
-  },
-  cornerBR: {
-    bottom: -2,
-    right: -2,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 4,
-  },
-  highlightBadge: {
-    position: 'absolute',
-    top: -22,
-    left: 0,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
     borderRadius: Radius.sm,
   },
-  highlightBadgeText: {
-    color: Colors.white,
-    fontSize: Typography.xs,
-    fontWeight: Typography.bold,
-  },
-  toggleRow: {
+  previewModes: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.pill,
-    padding: 3,
-    marginBottom: Spacing.base,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderRadius: Radius.pill,
+  zoomControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  toggleBtnActive: {
-    backgroundColor: Colors.primary,
-  },
-  toggleBtnText: {
-    fontSize: Typography.sm,
-    fontWeight: Typography.semiBold,
-    color: Colors.textSecondary,
-  },
-  toggleBtnTextActive: {
-    color: Colors.white,
-  },
-  proceedBtn: { marginBottom: Spacing.md },
 });

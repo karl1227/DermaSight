@@ -1,15 +1,25 @@
-import React from 'react';
+import { startNewScreening } from '../navigation/screeningFlow';
+import { useConnectivity } from '../connectivity/ConnectivityContext';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  Animated,
+  Easing,
+  AccessibilityInfo,
+  AppState,
 } from 'react-native';
-import { CompositeNavigationProp } from '@react-navigation/native';
+import {
+  CompositeNavigationProp,
+  useIsFocused,
+} from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, TabParamList } from '../types';
+import { useAuth } from '../auth/AuthContext';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type Props = {
@@ -20,6 +30,70 @@ type Props = {
 };
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const { state } = useAuth();
+  const connectivity = useConnectivity();
+  const focused = useIsFocused();
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [foreground, setForeground] = useState(
+    AppState.currentState === 'active',
+  );
+  const innerPulse = useRef(new Animated.Value(0)).current;
+  const outerPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(enabled => {
+        if (active) setReduceMotion(enabled);
+      })
+      .catch(() => {});
+    const motion = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+    const app = AppState.addEventListener('change', next =>
+      setForeground(next === 'active'),
+    );
+    return () => {
+      active = false;
+      motion.remove();
+      app.remove();
+    };
+  }, []);
+  useEffect(() => {
+    innerPulse.setValue(0);
+    outerPulse.setValue(0);
+    if (!focused || !foreground || reduceMotion) return;
+    const ease = Easing.inOut(Easing.sin);
+    const breathe = (value: Animated.Value) =>
+      Animated.sequence([
+        Animated.timing(value, {
+          toValue: 1,
+          duration: 1000,
+          easing: ease,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(value, {
+          toValue: 0,
+          duration: 1000,
+          easing: ease,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]);
+    const pulse = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([breathe(innerPulse), Animated.delay(180)]),
+        Animated.sequence([Animated.delay(180), breathe(outerPulse)]),
+      ]),
+    );
+    pulse.start();
+    return () => {
+      pulse.stop();
+      innerPulse.setValue(0);
+      outerPulse.setValue(0);
+    };
+  }, [focused, foreground, reduceMotion, innerPulse, outerPulse]);
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -28,17 +102,30 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Welcome to DermaSight</Text>
-          <Text style={styles.headerSubtitle}>AI-Assisted Skin Lesion Screening</Text>
+          <Text style={styles.headerSubtitle}>
+            {state.status === 'guest'
+              ? 'Guest · Local screening'
+              : state.status === 'authenticated'
+              ? `Hello, ${state.user.name}`
+              : 'AI-Assisted Skin Lesion Screening'}
+          </Text>
           <View style={styles.offlineBadge}>
             {/* wifi-slash icon */}
             <Text style={styles.offlineIcon}>&#8212;</Text>
-            <Text style={styles.offlineBadgeText}>Offline Mode Ready</Text>
+            <Text style={styles.offlineBadgeText}>
+              {connectivity === 'online'
+                ? 'Online · Local screening ready'
+                : connectivity === 'offline'
+                ? 'Offline · Screening available'
+                : 'Checking connection…'}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.settingsBtn}
           onPress={() => navigation.navigate('Settings')}
-          activeOpacity={0.75}>
+          activeOpacity={0.75}
+        >
           {/* Minimal gear icon */}
           <View style={styles.gearOuter}>
             <View style={styles.gearInner} />
@@ -57,12 +144,66 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Central scan CTA */}
       <View style={styles.ctaArea}>
-        <View style={styles.outerRing}>
-          <View style={styles.innerRing}>
+        <View style={styles.pulseArea}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.outerRing,
+              {
+                transform: [
+                  {
+                    scale: outerPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.08],
+                    }),
+                  },
+                ],
+                opacity: outerPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.6],
+                }),
+              },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.innerRing,
+              {
+                transform: [
+                  {
+                    scale: innerPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.06],
+                    }),
+                  },
+                ],
+                opacity: innerPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.75],
+                }),
+              },
+            ]}
+          />
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  scale: innerPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.02],
+                  }),
+                },
+              ],
+            }}
+          >
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Start New Screening"
               style={styles.scanCircle}
-              onPress={() => navigation.navigate('PatientInfo')}
-              activeOpacity={0.82}>
+              onPress={() => startNewScreening(navigation)}
+              activeOpacity={0.82}
+            >
               {/* Scan frame corners */}
               <View style={styles.scanFrame}>
                 <View style={[styles.corner, styles.cornerTL]} />
@@ -72,14 +213,22 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Text style={styles.scanText}>Start New{'\n'}Screening</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </View>
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('LesionGuide')}
+        style={{ padding: 16, alignItems: 'center' }}
+      >
+        <Text style={{ color: Colors.primary }}>Skin Lesion Guide</Text>
+      </TouchableOpacity>
       {/* Disclaimer card */}
       <View style={styles.disclaimerCard}>
         <Text style={styles.disclaimerText}>
-          DermaSight supports early awareness and does not provide final diagnosis
+          DermaSight supports early awareness and does not provide final
+          diagnosis
         </Text>
       </View>
     </View>
@@ -164,20 +313,21 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: Colors.textMuted,
   },
-  gearToothTop:    { top: -3,  left: 8 },
+  gearToothTop: { top: -3, left: 8 },
   gearToothBottom: { bottom: -3, left: 8 },
-  gearToothLeft:   { left: -3, top: 8 },
-  gearToothRight:  { right: -3, top: 8 },
-  gearToothTL:     { top: 0,   left: 0,   transform: [{ rotate: '45deg' }] },
-  gearToothTR:     { top: 0,   right: 0,  transform: [{ rotate: '45deg' }] },
-  gearToothBL:     { bottom: 0, left: 0,  transform: [{ rotate: '45deg' }] },
-  gearToothBR:     { bottom: 0, right: 0, transform: [{ rotate: '45deg' }] },
+  gearToothLeft: { left: -3, top: 8 },
+  gearToothRight: { right: -3, top: 8 },
+  gearToothTL: { top: 0, left: 0, transform: [{ rotate: '45deg' }] },
+  gearToothTR: { top: 0, right: 0, transform: [{ rotate: '45deg' }] },
+  gearToothBL: { bottom: 0, left: 0, transform: [{ rotate: '45deg' }] },
+  gearToothBR: { bottom: 0, right: 0, transform: [{ rotate: '45deg' }] },
   ctaArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outerRing: {
+    position: 'absolute',
     width: OUTER_RING_SIZE,
     height: OUTER_RING_SIZE,
     borderRadius: OUTER_RING_SIZE / 2,
@@ -185,7 +335,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pulseArea: {
+    width: OUTER_RING_SIZE,
+    height: OUTER_RING_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   innerRing: {
+    position: 'absolute',
     width: INNER_RING_SIZE,
     height: INNER_RING_SIZE,
     borderRadius: INNER_RING_SIZE / 2,
@@ -214,10 +371,34 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
     borderWidth: 2.5,
   },
-  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 2 },
-  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 2 },
-  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 2 },
-  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 2 },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 2,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 2,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 2,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 2,
+  },
   scanText: {
     fontSize: Typography.base,
     fontWeight: Typography.semiBold,

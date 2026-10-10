@@ -22,11 +22,31 @@ type Props = {
 };
 
 const ABCDE_ITEMS = [
-  { letter: 'A', name: 'Asymmetry', desc: 'One half of the mole does not match the other half in size, shape, color, or thickness.' },
-  { letter: 'B', name: 'Border', desc: 'The edges are uneven, ragged, notched, blurred, or irregularly defined.' },
-  { letter: 'C', name: 'Color', desc: 'The color is not the same throughout. May include shades of brown, black, pink, red, white, or blue.' },
-  { letter: 'D', name: 'Diameter', desc: 'The mole is larger than 6mm in diameter (about the size of a pencil eraser).' },
-  { letter: 'E', name: 'Evolution', desc: 'The mole is changing over time in size, shape, color, or new symptoms such as bleeding or itching.' },
+  {
+    letter: 'A',
+    name: 'Asymmetry',
+    desc: 'One half of the mole does not match the other half in size, shape, color, or thickness.',
+  },
+  {
+    letter: 'B',
+    name: 'Border',
+    desc: 'The edges are uneven, ragged, notched, blurred, or irregularly defined.',
+  },
+  {
+    letter: 'C',
+    name: 'Color',
+    desc: 'The color is not the same throughout. May include shades of brown, black, pink, red, white, or blue.',
+  },
+  {
+    letter: 'D',
+    name: 'Diameter',
+    desc: 'The mole is larger than 6mm in diameter (about the size of a pencil eraser).',
+  },
+  {
+    letter: 'E',
+    name: 'Evolution',
+    desc: 'The mole is changing over time in size, shape, color, or new symptoms such as bleeding or itching.',
+  },
 ];
 
 const LESION_CLASSES = [
@@ -34,7 +54,8 @@ const LESION_CLASSES = [
     name: 'Melanoma',
     abbreviation: 'MEL',
     riskLevel: 'high' as const,
-    description: 'Melanoma is the most serious form of skin cancer, developing in melanocytes (pigment-producing cells). It can spread rapidly to other parts of the body if not caught early.',
+    description:
+      'Melanoma is the most serious form of skin cancer, developing in melanocytes (pigment-producing cells). It can spread rapidly to other parts of the body if not caught early.',
     commonSigns: [
       'Asymmetric, irregularly shaped mole',
       'Border with notched or ragged edges',
@@ -47,7 +68,8 @@ const LESION_CLASSES = [
     name: 'Basal Cell Carcinoma',
     abbreviation: 'BCC',
     riskLevel: 'high' as const,
-    description: 'The most common form of skin cancer, basal cell carcinoma begins in basal cells. It rarely spreads but can cause significant local tissue destruction if left untreated.',
+    description:
+      'The most common form of skin cancer, basal cell carcinoma begins in basal cells. It rarely spreads but can cause significant local tissue destruction if left untreated.',
     commonSigns: [
       'Pearly or waxy bump, often with visible blood vessels',
       'Flat, flesh-colored or brown scar-like lesion',
@@ -60,7 +82,8 @@ const LESION_CLASSES = [
     name: 'Actinic Keratoses',
     abbreviation: 'AKIEC',
     riskLevel: 'precancerous' as const,
-    description: 'Actinic keratosis is a rough, scaly patch caused by years of sun exposure. It is considered precancerous and may develop into squamous cell carcinoma if untreated.',
+    description:
+      'Actinic keratosis is a rough, scaly patch caused by years of sun exposure. It is considered precancerous and may develop into squamous cell carcinoma if untreated.',
     commonSigns: [
       'Rough, dry, scaly patch of skin (less than 1 inch)',
       'Flat or slightly raised reddish patch',
@@ -73,7 +96,8 @@ const LESION_CLASSES = [
     name: 'Melanocytic Nevi',
     abbreviation: 'NV',
     riskLevel: 'benign' as const,
-    description: 'Commonly known as moles, melanocytic nevi are benign growths that form when melanocytes grow in clusters. Most moles are harmless but should be monitored for changes.',
+    description:
+      'Commonly known as moles, melanocytic nevi are benign growths that form when melanocytes grow in clusters. Most moles are harmless but should be monitored for changes.',
     commonSigns: [
       'Uniform round or oval shape',
       'Consistent brown, tan, or black color throughout',
@@ -86,7 +110,8 @@ const LESION_CLASSES = [
     name: 'Benign Keratosis',
     abbreviation: 'BKL',
     riskLevel: 'benign' as const,
-    description: 'Benign keratosis-like lesions include seborrheic keratoses and other harmless growths. They are non-cancerous and very common in older adults.',
+    description:
+      'Benign keratosis-like lesions include seborrheic keratoses and other harmless growths. They are non-cancerous and very common in older adults.',
     commonSigns: [
       'Waxy, "stuck-on" appearance',
       'Tan, brown, or black color, may vary',
@@ -99,7 +124,8 @@ const LESION_CLASSES = [
     name: 'Dermatofibroma',
     abbreviation: 'DF',
     riskLevel: 'benign' as const,
-    description: 'Dermatofibromas are benign skin growths (fibrous nodules) most commonly found on the lower legs. They are generally harmless and require no treatment.',
+    description:
+      'Dermatofibromas are benign skin growths (fibrous nodules) most commonly found on the lower legs. They are generally harmless and require no treatment.',
     commonSigns: [
       'Small, firm, raised nodule',
       'Brownish, reddish-brown, or tan color',
@@ -112,7 +138,8 @@ const LESION_CLASSES = [
     name: 'Vascular Lesions',
     abbreviation: 'VASC',
     riskLevel: 'benign' as const,
-    description: 'Vascular skin lesions are caused by abnormal blood vessels near the surface of the skin. Most are benign and range from cherry angiomas to port-wine stains.',
+    description:
+      'Vascular skin lesions are caused by abnormal blood vessels near the surface of the skin. Most are benign and range from cherry angiomas to port-wine stains.',
     commonSigns: [
       'Bright red, purple, or blue color',
       'Blanching (fading) when pressed firmly',
@@ -124,9 +151,18 @@ const LESION_CLASSES = [
 ];
 
 const ASSESSMENT_LEVELS = [
-  { dot: Colors.redDot, label: 'High Concern', classes: 'Melanoma, Basal Cell Carcinoma' },
-  { dot: Colors.orangeDot, label: 'Precancerous Indicator', classes: 'Actinic Keratoses' },
-  { dot: Colors.greenDot, label: 'Generally Benign', classes: 'Melanocytic Nevi, Benign Keratosis, Dermatofibroma, Vascular Lesions' },
+  {
+    dot: Colors.redDot,
+    label: 'High Risk',
+    classes: 'Melanoma, Basal Cell Carcinoma',
+  },
+  { dot: Colors.orangeDot, label: 'Medium Risk', classes: 'Actinic Keratoses' },
+  {
+    dot: Colors.greenDot,
+    label: 'Low Risk',
+    classes:
+      'Melanocytic Nevi, Benign Keratosis, Dermatofibroma, Vascular Lesions',
+  },
 ];
 
 export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
@@ -142,7 +178,8 @@ export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => navigation.goBack()}
-            activeOpacity={0.75}>
+            activeOpacity={0.75}
+          >
             <Text style={styles.backBtnText}>← Back</Text>
           </TouchableOpacity>
         )}
@@ -155,14 +192,14 @@ export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Educational notice */}
         <View style={styles.noticeCard}>
           <Text style={styles.noticeText}>
-            This guide is for educational purposes only. The ABCDE method
-            and lesion descriptions below are reference material and do not
-            replace professional medical diagnosis.
+            This guide is for educational purposes only. The ABCDE method and
+            lesion descriptions below are reference material and do not replace
+            professional medical diagnosis.
           </Text>
         </View>
 
@@ -170,10 +207,13 @@ export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.abcdeHeader}
           onPress={() => setAbcdeExpanded(p => !p)}
-          activeOpacity={0.85}>
+          activeOpacity={0.85}
+        >
           <View style={styles.abcdeTitleRow}>
             <Text style={styles.abcdeTitle}>ABCDE Method</Text>
-            <Text style={styles.abcdeSubtitle}>Melanoma Early Detection Guide</Text>
+            <Text style={styles.abcdeSubtitle}>
+              Melanoma Early Detection Guide
+            </Text>
           </View>
           <Text style={styles.chevron}>{abcdeExpanded ? '▲' : '▼'}</Text>
         </TouchableOpacity>
@@ -201,7 +241,9 @@ export const LesionGuideScreen: React.FC<Props> = ({ navigation }) => {
 
         {/* Assessment level color guide */}
         <View style={styles.colorGuideCard}>
-          <Text style={styles.colorGuideTitle}>Screening Status Color Guide</Text>
+          <Text style={styles.colorGuideTitle}>
+            Screening Status Color Guide
+          </Text>
           {ASSESSMENT_LEVELS.map(level => (
             <View key={level.label} style={styles.colorGuideRow}>
               <View style={[styles.colorDot, { backgroundColor: level.dot }]} />

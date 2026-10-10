@@ -20,9 +20,20 @@ import { RootStackParamList, ScreeningRecord, ScreeningStatus } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
 import { DisclaimerCard } from '../components/DisclaimerCard';
-import { getScreeningById, deleteScreening, updatePatientInfo } from '../database/database';
+import { useAuth } from '../auth/AuthContext';
+import {
+  getScreeningById,
+  deleteScreening,
+  updatePatientInfo,
+} from '../database/database';
 import { deleteLocalImage, toImageUri } from '../services/imageStorageService';
-import { formatDate, formatConfidence, getStatusColor, safeJsonParse } from '../utils';
+import {
+  formatDate,
+  formatConfidence,
+  normalizeScreeningStatus,
+  getStatusColor,
+  safeJsonParse,
+} from '../utils';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Report'>;
@@ -30,6 +41,8 @@ type Props = {
 };
 
 export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { owner } = useAuth();
+  const [imageMissing, setImageMissing] = useState(false);
   const { recordId } = route.params;
   const [record, setRecord] = useState<ScreeningRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,10 +55,19 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getScreeningById(recordId)
+    if (!owner) {
+      setRecord(null);
+      setLoading(false);
+      return;
+    }
+    getScreeningById(recordId, owner)
       .then(r => setRecord(r))
+      .catch(() => {
+        setRecord(null);
+        Alert.alert('Could not load report', 'Please try again.');
+      })
       .finally(() => setLoading(false));
-  }, [recordId]);
+  }, [recordId, owner]);
 
   const openEdit = () => {
     if (!record) return;
@@ -74,8 +96,9 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setSaving(true);
     try {
-      await updatePatientInfo(recordId, trimmedName, parsedAge, editSex);
-      const updated = await getScreeningById(recordId);
+      if (!owner) return;
+      await updatePatientInfo(recordId, trimmedName, parsedAge, editSex, owner);
+      const updated = await getScreeningById(recordId, owner);
       setRecord(updated);
       setEditVisible(false);
     } catch {
@@ -96,9 +119,14 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           style: 'destructive',
           onPress: async () => {
             if (!record) return;
-            await deleteLocalImage(record.image_path);
-            await deleteScreening(recordId);
-            navigation.goBack();
+            if (!owner) return;
+            try {
+              await deleteScreening(recordId, owner);
+              await deleteLocalImage(record.image_path);
+              navigation.goBack();
+            } catch {
+              Alert.alert('Could not delete report', 'Please try again.');
+            }
           },
         },
       ],
@@ -127,9 +155,17 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
-  const statusColor = getStatusColor(record.screening_status as ScreeningStatus);
-  const abcde = safeJsonParse<Record<string, boolean>>(record.abcde_answers, {});
-  const symptoms = safeJsonParse<Record<string, boolean>>(record.selected_symptoms, {});
+  const statusColor = getStatusColor(
+    record.screening_status as ScreeningStatus,
+  );
+  const abcde = safeJsonParse<Record<string, boolean>>(
+    record.abcde_answers,
+    {},
+  );
+  const symptoms = safeJsonParse<Record<string, boolean>>(
+    record.selected_symptoms,
+    {},
+  );
   const features = safeJsonParse<string[]>(record.matching_visual_features, []);
   const imageUri = toImageUri(record.image_path);
 
@@ -176,7 +212,8 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => navigation.goBack()}>
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Screening Report</Text>
@@ -186,13 +223,14 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Lesion image */}
-        {record.image_path ? (
+        {record.image_path && !imageMissing ? (
           <Image
             source={{ uri: imageUri }}
             style={styles.image}
+            onError={() => setImageMissing(true)}
             resizeMode="cover"
           />
         ) : (
@@ -208,11 +246,12 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
             <TouchableOpacity
               style={styles.editBtn}
               onPress={openEdit}
-              activeOpacity={0.7}>
+              activeOpacity={0.7}
+            >
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
-          <InfoRow label="Patient ID" value={record.patient_id} />
+          <InfoRow label="Screening ID" value={record.patient_id} />
           <View style={styles.divider} />
           <InfoRow label="Full Name" value={record.full_name} />
           <View style={styles.divider} />
@@ -237,11 +276,18 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           ) : (
             <Text style={styles.noneText}>None selected</Text>
           )}
-          <Text style={[styles.subLabel, { marginTop: Spacing.md }]}>Other Signs</Text>
+          <Text style={[styles.subLabel, { marginTop: Spacing.md }]}>
+            Other Signs
+          </Text>
           {selectedSymptoms.length > 0 ? (
             selectedSymptoms.map(s => (
               <View key={s} style={styles.tagRow}>
-                <View style={[styles.tagDot, { backgroundColor: Colors.primaryDark }]} />
+                <View
+                  style={[
+                    styles.tagDot,
+                    { backgroundColor: Colors.primaryDark },
+                  ]}
+                />
                 <Text style={styles.tagText}>{s}</Text>
               </View>
             ))
@@ -253,7 +299,10 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Classification Result */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Classification Result</Text>
-          <InfoRow label="Predicted Lesion" value={record.predicted_lesion_type} />
+          <InfoRow
+            label="Predicted Lesion"
+            value={record.predicted_lesion_type}
+          />
           <View style={styles.divider} />
           <InfoRow
             label="Confidence Score"
@@ -262,9 +311,14 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Screening Status</Text>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusColor + '18' },
+              ]}
+            >
               <Text style={[styles.statusText, { color: statusColor }]}>
-                {record.screening_status}
+                {normalizeScreeningStatus(record.screening_status)}
               </Text>
             </View>
           </View>
@@ -302,10 +356,12 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
         visible={editVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setEditVisible(false)}>
+        onRequestClose={() => setEditVisible(false)}
+      >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
 
@@ -350,12 +406,14 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
                     editSex === option && styles.sexOptionActive,
                   ]}
                   onPress={() => setEditSex(option)}
-                  activeOpacity={0.7}>
+                  activeOpacity={0.7}
+                >
                   <Text
                     style={[
                       styles.sexOptionText,
                       editSex === option && styles.sexOptionTextActive,
-                    ]}>
+                    ]}
+                  >
                     {option}
                   </Text>
                 </TouchableOpacity>
@@ -368,14 +426,16 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
                 style={styles.cancelModalBtn}
                 onPress={() => setEditVisible(false)}
                 activeOpacity={0.7}
-                disabled={saving}>
+                disabled={saving}
+              >
                 <Text style={styles.cancelModalText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
                 onPress={handleSave}
                 activeOpacity={0.85}
-                disabled={saving}>
+                disabled={saving}
+              >
                 {saving ? (
                   <ActivityIndicator size="small" color={Colors.white} />
                 ) : (
