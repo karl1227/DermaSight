@@ -46,8 +46,15 @@ export type IconName =
   | 'trash'
   | 'info'
   | 'medical'
+  | 'camera'
+  | 'gallery'
+  | 'switchCamera'
   | 'home';
 const paths: Record<IconName, string> = {
+  camera: 'M3 6h4l2-3h6l2 3h4v15H3z M16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  gallery: 'M5 3h16v16H5z M2 7v15h15 M5 16l5-5 4 4 3-3 4 4 M16 7h.01',
+  switchCamera:
+    'M5 7h3l2-3h4l2 3h3v13H5z M8 13a4 4 0 0 1 7-2 M15 8v3h-3 M16 15a4 4 0 0 1-7 2 M9 20v-3h3',
   user: 'M20 21v-2a6 6 0 0 0-6-6h-4a6 6 0 0 0-6 6v2',
   signup: 'M16 21v-2a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v2 M20 8v6 M17 11h6',
   signin: 'M14 3h5v18h-5 M3 12h12 M10 7l5 5-5 5',

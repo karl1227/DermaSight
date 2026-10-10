@@ -1,13 +1,21 @@
+import { startNewScreening } from '../navigation/screeningFlow';
 import { useConnectivity } from '../connectivity/ConnectivityContext';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  Animated,
+  Easing,
+  AccessibilityInfo,
+  AppState,
 } from 'react-native';
-import { CompositeNavigationProp } from '@react-navigation/native';
+import {
+  CompositeNavigationProp,
+  useIsFocused,
+} from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, TabParamList } from '../types';
@@ -24,6 +32,68 @@ type Props = {
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { state } = useAuth();
   const connectivity = useConnectivity();
+  const focused = useIsFocused();
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [foreground, setForeground] = useState(
+    AppState.currentState === 'active',
+  );
+  const innerPulse = useRef(new Animated.Value(0)).current;
+  const outerPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(enabled => {
+        if (active) setReduceMotion(enabled);
+      })
+      .catch(() => {});
+    const motion = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+    const app = AppState.addEventListener('change', next =>
+      setForeground(next === 'active'),
+    );
+    return () => {
+      active = false;
+      motion.remove();
+      app.remove();
+    };
+  }, []);
+  useEffect(() => {
+    innerPulse.setValue(0);
+    outerPulse.setValue(0);
+    if (!focused || !foreground || reduceMotion) return;
+    const ease = Easing.inOut(Easing.sin);
+    const breathe = (value: Animated.Value) =>
+      Animated.sequence([
+        Animated.timing(value, {
+          toValue: 1,
+          duration: 1000,
+          easing: ease,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(value, {
+          toValue: 0,
+          duration: 1000,
+          easing: ease,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]);
+    const pulse = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([breathe(innerPulse), Animated.delay(180)]),
+        Animated.sequence([Animated.delay(180), breathe(outerPulse)]),
+      ]),
+    );
+    pulse.start();
+    return () => {
+      pulse.stop();
+      innerPulse.setValue(0);
+      outerPulse.setValue(0);
+    };
+  }, [focused, foreground, reduceMotion, innerPulse, outerPulse]);
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -74,11 +144,64 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Central scan CTA */}
       <View style={styles.ctaArea}>
-        <View style={styles.outerRing}>
-          <View style={styles.innerRing}>
+        <View style={styles.pulseArea}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.outerRing,
+              {
+                transform: [
+                  {
+                    scale: outerPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.08],
+                    }),
+                  },
+                ],
+                opacity: outerPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.6],
+                }),
+              },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.innerRing,
+              {
+                transform: [
+                  {
+                    scale: innerPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.06],
+                    }),
+                  },
+                ],
+                opacity: innerPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.75],
+                }),
+              },
+            ]}
+          />
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  scale: innerPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.02],
+                  }),
+                },
+              ],
+            }}
+          >
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Start New Screening"
               style={styles.scanCircle}
-              onPress={() => navigation.push('PatientInfo')}
+              onPress={() => startNewScreening(navigation)}
               activeOpacity={0.82}
             >
               {/* Scan frame corners */}
@@ -90,7 +213,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Text style={styles.scanText}>Start New{'\n'}Screening</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </View>
 
@@ -204,6 +327,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outerRing: {
+    position: 'absolute',
     width: OUTER_RING_SIZE,
     height: OUTER_RING_SIZE,
     borderRadius: OUTER_RING_SIZE / 2,
@@ -211,7 +335,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pulseArea: {
+    width: OUTER_RING_SIZE,
+    height: OUTER_RING_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   innerRing: {
+    position: 'absolute',
     width: INNER_RING_SIZE,
     height: INNER_RING_SIZE,
     borderRadius: INNER_RING_SIZE / 2,

@@ -1,4 +1,5 @@
 // ─── Core Data Types ─────────────────────────────────────────────────────────
+import type { NavigatorScreenParams } from '@react-navigation/native';
 
 export interface PatientInfo {
   patientId: string; // compatibility display alias for the screening UUID
@@ -49,9 +50,9 @@ export type LesionClass =
   | 'Vascular Lesions';
 
 export type ScreeningStatus =
-  | 'High Concern'
-  | 'Precancerous Indicator'
-  | 'Generally Benign'
+  | 'High Risk'
+  | 'Medium Risk'
+  | 'Low Risk'
   | 'Low Confidence';
 
 export type ThresholdStatus = 'Above Threshold' | 'Below Threshold';
@@ -103,7 +104,7 @@ export type RootStackParamList = {
   PrivacyConsent: undefined;
   SettingsMedicalDisclaimer: undefined;
   SettingsPrivacyConsent: undefined;
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<TabParamList> | undefined;
   Settings: undefined;
   EditProfile: undefined;
   AccountSecurity: undefined;
@@ -112,6 +113,7 @@ export type RootStackParamList = {
   SymptomChecklist: { patientInfo: PatientInfo };
   Camera: { patientInfo: PatientInfo; symptoms: SelectedSymptoms };
   ConfirmImage: {
+    imageEntry?: 'camera' | 'gallery';
     patientInfo: PatientInfo;
     symptoms: SelectedSymptoms;
     imageUri: string;

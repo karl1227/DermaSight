@@ -1,3 +1,4 @@
+import { returnToDashboard } from '../navigation/screeningFlow';
 import React, { useRef, useState } from 'react';
 import {
   View,
@@ -124,7 +125,7 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
     setFinishing(true);
     try {
       await auth.completeOnboarding();
-      navigation.replace('MainTabs');
+      returnToDashboard(navigation);
     } catch {
       Alert.alert(
         'Could not finish setup',

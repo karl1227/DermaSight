@@ -2281,6 +2281,7 @@ PODS:
   - TensorFlowLiteC (2.17.0):
     - TensorFlowLiteC/Core (= 2.17.0)
   - TensorFlowLiteC/Core (2.17.0)
+  - TensorFlowLiteSelectTfOps (2.17.0)
   - vision-camera-resize-plugin (3.2.0):
     - hermes-engine
     - RCTRequired
@@ -2411,6 +2412,7 @@ DEPENDENCIES:
   - RNKeychain (from `../node_modules/react-native-keychain`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
+  - TensorFlowLiteSelectTfOps (= 2.17.0)
   - vision-camera-resize-plugin (from `../node_modules/vision-camera-resize-plugin`)
   - VisionCamera (from `../node_modules/react-native-vision-camera`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
@@ -2427,6 +2429,7 @@ SPEC REPOS:
     - PromisesSwift
     - RecaptchaInterop
     - TensorFlowLiteC
+    - TensorFlowLiteSelectTfOps
 
 EXTERNAL SOURCES:
   FBLazyVector:
@@ -2715,10 +2718,11 @@ SPEC CHECKSUMS:
   RNScreens: 991cc417cd396602a6cf59a42139e5a9d91462a9
   RNSVG: 6cae8d4082913be2eb43eaec2a456222c42195ed
   TensorFlowLiteC: eac6d689a8d391d1b202dc59e3d9165ba64aaf73
+  TensorFlowLiteSelectTfOps: e991d57ef32c40330a0bfcedd7955e6a5cab2efe
   vision-camera-resize-plugin: 27b679228dbc7864e5ceb0878503d71b8cb2069a
   VisionCamera: 0044a94f7489f19e19d5938e97dfc36f4784af3c
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
-PODFILE CHECKSUM: c1d98e3ab894cba03fb94dae5d980950bf7b14ca
+PODFILE CHECKSUM: 6937132ae7477c7c5f51c2fd14392c2291861d7f
 
 COCOAPODS: 1.15.2

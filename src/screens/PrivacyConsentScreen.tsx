@@ -1,3 +1,4 @@
+import { returnToDashboard } from '../navigation/screeningFlow';
 import React from 'react';
 import {
   View,
@@ -94,7 +95,7 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await markFirstRunCompleted();
       completeConsent();
-      navigation.replace('MainTabs');
+      returnToDashboard(navigation);
     } catch {
       Alert.alert('Could not save consent', 'Please try again.');
     }

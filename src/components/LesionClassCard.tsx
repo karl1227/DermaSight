@@ -25,9 +25,9 @@ const RISK_BG: Record<RiskLevel, string> = {
 };
 
 const RISK_LABELS: Record<RiskLevel, string> = {
-  high: 'High Concern',
-  precancerous: 'Precancerous',
-  benign: 'Generally Benign',
+  high: 'High Risk',
+  precancerous: 'Medium Risk',
+  benign: 'Low Risk',
 };
 
 export const LesionClassCard: React.FC<LesionClassCardProps> = ({
@@ -45,7 +45,8 @@ export const LesionClassCard: React.FC<LesionClassCardProps> = ({
     <TouchableOpacity
       style={[styles.card, { borderLeftColor: dotColor }]}
       onPress={() => setExpanded(prev => !prev)}
-      activeOpacity={0.85}>
+      activeOpacity={0.85}
+    >
       <View style={styles.header}>
         <View style={[styles.dot, { backgroundColor: dotColor }]} />
         <View style={styles.headerText}>

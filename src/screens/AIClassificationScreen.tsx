@@ -1,3 +1,4 @@
+import { showScreeningResult } from '../navigation/screeningFlow';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -11,7 +12,11 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList, LesionClass, ClassificationResult } from '../types';
+import {
+  RootStackParamList,
+  LesionClass,
+  ClassificationResult,
+} from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { runInference } from '../services/tfliteService';
 
@@ -43,15 +48,26 @@ export const AIClassificationScreen: React.FC<Props> = ({
   navigation,
   route,
 }) => {
-  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType, preprocessingId } = route.params;
+  const {
+    patientInfo,
+    symptoms,
+    imageUri,
+    imagePath,
+    imageData,
+    imageType,
+    preprocessingId,
+  } = route.params;
   const sourceImagePath = imagePath ?? imageUri;
 
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [activeClass, setActiveClass] = useState<number>(-1);
-  const [classificationResult, setClassificationResult] = useState<ClassificationResult | null>(null);
-  const [inferenceDurationMs, setInferenceDurationMs] = useState<number | null>(null);
+  const [classificationResult, setClassificationResult] =
+    useState<ClassificationResult | null>(null);
+  const [inferenceDurationMs, setInferenceDurationMs] = useState<number | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -118,7 +134,8 @@ export const AIClassificationScreen: React.FC<Props> = ({
         setActiveClass(-1);
       } catch (err) {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : 'Unknown runtime error';
+        const message =
+          err instanceof Error ? err.message : 'Unknown runtime error';
         setError(`Classification failed: ${message}`);
         setActiveClass(-1);
       }
@@ -138,7 +155,7 @@ export const AIClassificationScreen: React.FC<Props> = ({
 
   const handleContinue = () => {
     if (!classificationResult) return;
-    navigation.replace('Result', {
+    showScreeningResult(navigation, {
       patientInfo,
       symptoms,
       imageUri,
@@ -160,19 +177,23 @@ export const AIClassificationScreen: React.FC<Props> = ({
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.progressCenter}>
           <View style={styles.progressCircleOuter}>
             <Animated.View
               style={[
                 styles.progressSpinner,
                 { transform: [{ rotate: spin }] },
-              ]}>
+              ]}
+            >
               <View style={styles.spinnerArc} />
             </Animated.View>
             <View style={styles.progressInner}>
               <Text style={styles.progressPercent}>{progress}%</Text>
-              <Text style={styles.progressLabel}>{classificationResult ? 'Complete' : 'Processing'}</Text>
+              <Text style={styles.progressLabel}>
+                {classificationResult ? 'Complete' : 'Processing'}
+              </Text>
             </View>
           </View>
         </View>
@@ -188,13 +209,17 @@ export const AIClassificationScreen: React.FC<Props> = ({
                   idx === activeClass && styles.chipActive,
                   classificationResult
                     ? styles.chipScanned
-                    : completedSteps.length > 0 && idx < activeClass && styles.chipScanned,
-                ]}>
+                    : completedSteps.length > 0 &&
+                      idx < activeClass &&
+                      styles.chipScanned,
+                ]}
+              >
                 <Text
                   style={[
                     styles.chipText,
                     idx === activeClass && styles.chipTextActive,
-                  ]}>
+                  ]}
+                >
                   {cls}
                 </Text>
               </View>
@@ -214,7 +239,8 @@ export const AIClassificationScreen: React.FC<Props> = ({
                   isActive && styles.stepActive,
                   isCompleted && styles.stepDone,
                   idx === INFERENCE_STEPS.length - 1 && styles.stepLast,
-                ]}>
+                ]}
+              >
                 <Text style={styles.stepIcon}>
                   {isCompleted ? 'OK' : isActive ? '>' : 'o'}
                 </Text>
@@ -223,7 +249,8 @@ export const AIClassificationScreen: React.FC<Props> = ({
                     styles.stepText,
                     isCompleted && styles.stepTextDone,
                     isActive && styles.stepTextActive,
-                  ]}>
+                  ]}
+                >
                   {step.label}
                 </Text>
                 {isActive && (
@@ -236,11 +263,17 @@ export const AIClassificationScreen: React.FC<Props> = ({
 
         <View style={styles.modelCard}>
           <Text style={styles.modelCardTitle}>
-            {classificationResult ? 'CNN Analysis Complete' : 'Available CNN Model'}
+            {classificationResult
+              ? 'CNN Analysis Complete'
+              : 'Available CNN Model'}
           </Text>
           <Text style={styles.modelCardText}>
             {classificationResult
-              ? `The EfficientNet TensorFlow Lite model processed the captured image locally on this device${inferenceDurationMs !== null ? ` in ${(inferenceDurationMs / 1000).toFixed(2)} seconds` : ''}.`
+              ? `The EfficientNet TensorFlow Lite model processed the captured image locally on this device${
+                  inferenceDurationMs !== null
+                    ? ` in ${(inferenceDurationMs / 1000).toFixed(2)} seconds`
+                    : ''
+                }.`
               : 'EfficientNet TensorFlow Lite model trained for the supported HAM10000 lesion classes.'}
           </Text>
         </View>
@@ -252,14 +285,28 @@ export const AIClassificationScreen: React.FC<Props> = ({
               <TouchableOpacity
                 style={styles.errorBtn}
                 onPress={() => navigation.goBack()}
-                activeOpacity={0.8}>
+                activeOpacity={0.8}
+              >
                 <Text style={styles.errorBtnText}>Go Back</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.errorBtn, styles.errorBtnPrimary]}
-                onPress={() => navigation.replace('AIClassification', { patientInfo, symptoms, imageUri, imagePath: sourceImagePath, imageData, imageType, preprocessingId })}
-                activeOpacity={0.8}>
-                <Text style={[styles.errorBtnText, styles.errorBtnTextPrimary]}>Retry</Text>
+                onPress={() =>
+                  navigation.replace('AIClassification', {
+                    patientInfo,
+                    symptoms,
+                    imageUri,
+                    imagePath: sourceImagePath,
+                    imageData,
+                    imageType,
+                    preprocessingId,
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.errorBtnText, styles.errorBtnTextPrimary]}>
+                  Retry
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -269,14 +316,18 @@ export const AIClassificationScreen: React.FC<Props> = ({
           <TouchableOpacity
             style={styles.continueBtn}
             onPress={handleContinue}
-            activeOpacity={0.8}>
-            <Text style={styles.continueBtnText}>Continue to Screening Result</Text>
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueBtnText}>
+              Continue to Screening Result
+            </Text>
           </TouchableOpacity>
         )}
 
         <View style={styles.footerNote}>
           <Text style={styles.footerNoteText}>
-            All inference runs locally on device. No data is transmitted to any server.
+            All inference runs locally on device. No data is transmitted to any
+            server.
           </Text>
         </View>
       </ScrollView>

@@ -23,3 +23,13 @@ git switch codex/preserve-app-before-model
 ```
 
 Keep the model-update branch for review. Do not reset or overwrite local changes to switch branches.
+
+## iPhone unresolved-ops repair
+
+The phone reported `Status: unresolved-ops` while allocating the classifier tensors. The export contains FlexMul, FlexConv2D and other Select TensorFlow operators. The standard TensorFlowLiteC runtime alone cannot execute them.
+
+The iOS Podfile now adds `TensorFlowLiteSelectTfOps` 2.17.0, matching TensorFlowLiteC 2.17.0, and force-loads the delegate for physical iPhone builds so registration is retained. This follows Google's Select Ops integration instructions: https://developers.google.com/edge/litert/conversion/tensorflow/ops_select . Native rebuilding and installing the app is required; Metro reload alone cannot add this library.
+
+This library increases app size substantially and the supplied framework supports physical arm64 iOS devices. CocoaPods reports conflicting simulator architecture exclusions; simulator classification is not verified. Android's Select Ops support has not been changed by this repair. A future built-in-operators-only export from the original trained model would avoid the Flex dependency; it requires the teammate's training/export source, which is not in this repository.
+
+iPhone repair verification: `pod install` completed with Select Ops 2.17.0; physical iPhone Debug build returned BUILD SUCCEEDED. Symbol inspection of SkinSense.debug.dylib confirmed `TF_AcquireFlexDelegate` and `tflite::AcquireFlexDelegate` are linked. The rebuilt app was installed over the existing com.emman.dermasight app on the paired iPhone without uninstalling it. A real scan on the phone is still needed to confirm inference after installation.

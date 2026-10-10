@@ -1,3 +1,9 @@
+import {
+  startNewScreening,
+  returnToDashboard,
+  showSavedReport,
+  retakeScreeningImage,
+} from '../navigation/screeningFlow';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -17,8 +23,15 @@ import { ResultBasisCard } from '../components/ResultBasisCard';
 import { DisclaimerCard } from '../components/DisclaimerCard';
 import { useAuth } from '../auth/AuthContext';
 import { insertScreening, historyEnabledFor } from '../database/database';
-import { saveImageLocally, deleteLocalImage } from '../services/imageStorageService';
-import { formatConfidence, getStatusColor } from '../utils';
+import {
+  saveImageLocally,
+  deleteLocalImage,
+} from '../services/imageStorageService';
+import {
+  formatConfidence,
+  normalizeScreeningStatus,
+  getStatusColor,
+} from '../utils';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Result'>;
@@ -38,60 +51,83 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
   const statusColor = getStatusColor(result.screeningStatus);
 
   const handleSave = async (automatic = false) => {
-    if (savedIdRef.current) { if (!automatic) navigation.navigate('Report', { recordId: savedIdRef.current }); return; }
-    if (savingLock.current) return;
-    if (!owner || owner.id !== patientInfo.owner.id || owner.kind !== patientInfo.owner.kind) {
-      setSaveError('This screening session has ended. Start a new screening.'); return;
+    if (savedIdRef.current) {
+      if (!automatic) showSavedReport(navigation, savedIdRef.current);
+      return;
     }
-    savingLock.current = true; setSaving(true); setSaveError('');
+    if (savingLock.current) return;
+    if (
+      !owner ||
+      owner.id !== patientInfo.owner.id ||
+      owner.kind !== patientInfo.owner.kind
+    ) {
+      setSaveError('This screening session has ended. Start a new screening.');
+      return;
+    }
+    savingLock.current = true;
+    setSaving(true);
+    setSaveError('');
     let savedImagePath = '';
     try {
-      if (!(await historyEnabledFor(owner))) { setSaveError('History saving is disabled in Settings.'); return; }
+      if (!(await historyEnabledFor(owner))) {
+        setSaveError('History saving is disabled in Settings.');
+        return;
+      }
       // Save image to local storage and get persistent path
       savedImagePath = await saveImageLocally(imageUri);
 
       // Insert screening record into SQLite
-      const insertedId = await insertScreening({
-        screening_id: patientInfo.screeningId,
-        patient_id: patientInfo.patientId,
-        full_name: patientInfo.fullName,
-        age: patientInfo.age,
-        sex: patientInfo.sex,
-        lesion_location: patientInfo.lesionLocation,
-        selected_symptoms: JSON.stringify(symptoms.other),
-        abcde_answers: JSON.stringify(symptoms.abcde),
-        image_path: savedImagePath,
-        predicted_lesion_type: result.predictedLesionType,
-        confidence_score: result.confidenceScore,
-        screening_status: result.screeningStatus,
-        threshold_status: result.thresholdStatus,
-        matching_visual_features: JSON.stringify(result.matchingVisualFeatures),
-        // Legacy database columns are kept so existing installations remain compatible.
-        recommendation_basis: '',
-        recommendation: '',
-        created_at: patientInfo.createdAt,
-      }, owner);
-      savedIdRef.current = insertedId; setSavedId(insertedId);
-
-      if (!automatic) Alert.alert(
-        'Saved',
-        'Screening record has been saved to your history.',
-        [
-          {
-            text: 'View History',
-            onPress: () => navigation.navigate('MainTabs'),
-          },
-          {
-            text: 'View Report',
-            onPress: () => navigation.navigate('Report', { recordId: insertedId }),
-          },
-        ],
+      const insertedId = await insertScreening(
+        {
+          screening_id: patientInfo.screeningId,
+          patient_id: patientInfo.patientId,
+          full_name: patientInfo.fullName,
+          age: patientInfo.age,
+          sex: patientInfo.sex,
+          lesion_location: patientInfo.lesionLocation,
+          selected_symptoms: JSON.stringify(symptoms.other),
+          abcde_answers: JSON.stringify(symptoms.abcde),
+          image_path: savedImagePath,
+          predicted_lesion_type: result.predictedLesionType,
+          confidence_score: result.confidenceScore,
+          screening_status: result.screeningStatus,
+          threshold_status: result.thresholdStatus,
+          matching_visual_features: JSON.stringify(
+            result.matchingVisualFeatures,
+          ),
+          // Legacy database columns are kept so existing installations remain compatible.
+          recommendation_basis: '',
+          recommendation: '',
+          created_at: patientInfo.createdAt,
+        },
+        owner,
       );
+      savedIdRef.current = insertedId;
+      setSavedId(insertedId);
+
+      if (!automatic)
+        Alert.alert(
+          'Saved',
+          'Screening record has been saved to your history.',
+          [
+            {
+              text: 'View History',
+              onPress: () => returnToDashboard(navigation, 'History'),
+            },
+            {
+              text: 'View Report',
+              onPress: () => showSavedReport(navigation, insertedId),
+            },
+          ],
+        );
     } catch {
       if (savedImagePath) await deleteLocalImage(savedImagePath);
-      setSaveError('Could not save this screening. Keep this screen open and tap Retry Save.');
+      setSaveError(
+        'Could not save this screening. Keep this screen open and tap Retry Save.',
+      );
     } finally {
-      savingLock.current = false; setSaving(false);
+      savingLock.current = false;
+      setSaving(false);
     }
   };
 
@@ -107,16 +143,20 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Preliminary Screening Result</Text>
-        <Text style={styles.headerSubtitle}>Educational screening completed</Text>
+        <Text style={styles.headerSubtitle}>
+          Educational screening completed
+        </Text>
       </View>
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Assessment message banner */}
-        <View style={[styles.assessmentBanner, { borderLeftColor: statusColor }]}>
+        <View
+          style={[styles.assessmentBanner, { borderLeftColor: statusColor }]}
+        >
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
           <View style={styles.assessmentContent}>
             <Text style={styles.assessmentLabel}>Assessment Message</Text>
@@ -131,19 +171,23 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.lowConfCard}>
             <Text style={styles.lowConfTitle}>Low Confidence Result</Text>
             <Text style={styles.lowConfText}>
-              The image did not meet the minimum confidence threshold
-              (70%) for a reliable preliminary classification.
+              The image did not meet the minimum confidence threshold (70%) for
+              a reliable preliminary classification.
             </Text>
             <View style={styles.lowConfActions}>
               <TouchableOpacity
                 style={styles.lowConfBtn}
-                onPress={() => navigation.goBack()}>
+                onPress={() => retakeScreeningImage(navigation, route.params)}
+              >
                 <Text style={styles.lowConfBtnText}>Retake Image</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.lowConfBtn, styles.lowConfBtnSecondary]}
-                onPress={() => navigation.navigate('LesionGuide')}>
-                <Text style={[styles.lowConfBtnText, { color: Colors.primary }]}>
+                onPress={() => navigation.navigate('LesionGuide')}
+              >
+                <Text
+                  style={[styles.lowConfBtnText, { color: Colors.primary }]}
+                >
                   Consult Guide
                 </Text>
               </TouchableOpacity>
@@ -157,7 +201,9 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Predicted Lesion Type</Text>
-            <Text style={styles.summaryValue}>{result.predictedLesionType}</Text>
+            <Text style={styles.summaryValue}>
+              {result.predictedLesionType}
+            </Text>
           </View>
           <View style={styles.divider} />
 
@@ -171,9 +217,14 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Screening Status</Text>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: statusColor + '18' },
+              ]}
+            >
               <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-                {result.screeningStatus}
+                {normalizeScreeningStatus(result.screeningStatus)}
               </Text>
             </View>
           </View>
@@ -200,9 +251,22 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
         <DisclaimerCard type="medical" />
 
         {/* Action buttons */}
-        {saveError ? <Text accessibilityRole="alert" style={{ color: Colors.danger, marginBottom: 12 }}>{saveError}</Text> : null}
+        {saveError ? (
+          <Text
+            accessibilityRole="alert"
+            style={{ color: Colors.danger, marginBottom: 12 }}
+          >
+            {saveError}
+          </Text>
+        ) : null}
         <AppButton
-          label={savedId ? 'View Saved Report' : saveError ? 'Retry Save' : 'Save Result to History'}
+          label={
+            savedId
+              ? 'View Saved Report'
+              : saveError
+              ? 'Retry Save'
+              : 'Save Result to History'
+          }
           onPress={() => handleSave()}
           size="lg"
           loading={saving}
@@ -211,7 +275,15 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <AppButton
           label="New Screening"
-          onPress={() => navigation.push('PatientInfo')}
+          onPress={() => startNewScreening(navigation)}
+          variant="outline"
+          size="lg"
+          style={styles.newBtn}
+        />
+
+        <AppButton
+          label="Back to Home"
+          onPress={() => returnToDashboard(navigation)}
           variant="outline"
           size="lg"
           style={styles.newBtn}

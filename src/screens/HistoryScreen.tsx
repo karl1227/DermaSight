@@ -1,3 +1,4 @@
+import { startNewScreening } from '../navigation/screeningFlow';
 import React, { useCallback, useState } from 'react';
 import {
   View,
@@ -10,15 +11,28 @@ import {
   ListRenderItem,
   Alert,
 } from 'react-native';
-import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
+import {
+  CompositeNavigationProp,
+  useFocusEffect,
+} from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, ScreeningRecord, ScreeningStatus, TabParamList } from '../types';
+import {
+  RootStackParamList,
+  ScreeningRecord,
+  ScreeningStatus,
+  TabParamList,
+} from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { useAuth } from '../auth/AuthContext';
 import { getAllScreenings, deleteScreening } from '../database/database';
 import { deleteLocalImage } from '../services/imageStorageService';
-import { formatDate, formatConfidence, getStatusColor } from '../utils';
+import {
+  formatDate,
+  formatConfidence,
+  normalizeScreeningStatus,
+  getStatusColor,
+} from '../utils';
 
 type Props = {
   navigation: CompositeNavigationProp<
@@ -35,7 +49,10 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   const loadRecords = useCallback(async () => {
     try {
-      if (!owner) { setRecords([]); return; }
+      if (!owner) {
+        setRecords([]);
+        return;
+      }
       const data = await getAllScreenings(owner);
       setLoadError(false);
       setRecords(data);
@@ -73,7 +90,9 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
               await deleteScreening(item.id!, owner);
               await deleteLocalImage(item.image_path);
               await loadRecords();
-            } catch { Alert.alert('Could not delete record', 'Please try again.'); }
+            } catch {
+              Alert.alert('Could not delete record', 'Please try again.');
+            }
           },
         },
       ],
@@ -81,21 +100,29 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderItem: ListRenderItem<ScreeningRecord> = ({ item }) => {
-    const statusColor = getStatusColor(item.screening_status as ScreeningStatus);
+    const statusColor = getStatusColor(
+      item.screening_status as ScreeningStatus,
+    );
     return (
       <TouchableOpacity
         style={styles.card}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={400}
-        activeOpacity={0.95}>
+        activeOpacity={0.95}
+      >
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.lesionType}>{item.predicted_lesion_type}</Text>
             <Text style={styles.patientName}>{item.full_name}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + '18' },
+            ]}
+          >
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {item.screening_status}
+              {normalizeScreeningStatus(item.screening_status)}
             </Text>
           </View>
         </View>
@@ -113,16 +140,17 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>Date</Text>
-            <Text style={styles.metaValue}>{formatDate(item.created_at).split('at')[0]}</Text>
+            <Text style={styles.metaValue}>
+              {formatDate(item.created_at).split('at')[0]}
+            </Text>
           </View>
         </View>
 
         <TouchableOpacity
           style={styles.viewBtn}
-          onPress={() =>
-            navigation.navigate('Report', { recordId: item.id! })
-          }
-          activeOpacity={0.8}>
+          onPress={() => navigation.navigate('Report', { recordId: item.id! })}
+          activeOpacity={0.8}
+        >
           <Text style={styles.viewBtnText}>View Report →</Text>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -131,14 +159,19 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   const EmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>{loadError ? 'Could not load records' : 'No Saved Screenings'}</Text>
+      <Text style={styles.emptyTitle}>
+        {loadError ? 'Could not load records' : 'No Saved Screenings'}
+      </Text>
       <Text style={styles.emptyText}>
-        {loadError ? 'Pull down to retry. Your saved records have not been deleted.' : 'Complete a screening to view the result here.'}
+        {loadError
+          ? 'Pull down to retry. Your saved records have not been deleted.'
+          : 'Complete a screening to view the result here.'}
       </Text>
       <TouchableOpacity
         style={styles.emptyBtn}
-        onPress={() => navigation.push('PatientInfo')}
-        activeOpacity={0.8}>
+        onPress={() => startNewScreening(navigation)}
+        activeOpacity={0.8}
+      >
         <Text style={styles.emptyBtnText}>Start First Screening</Text>
       </TouchableOpacity>
     </View>

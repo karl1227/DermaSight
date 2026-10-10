@@ -3,7 +3,8 @@ import { Text, View, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../auth/AuthContext';
 import { getAllScreenings } from '../database/database';
-import { ScreeningRecord } from '../types';
+import { ScreeningRecord, LesionClass } from '../types';
+import { getScreeningStatus, getStatusColor } from '../utils';
 import { AccountScreen, a, AccountColors } from '../components/AccountUI';
 export function AnalyticsScreen() {
   const { owner } = useAuth();
@@ -46,6 +47,14 @@ export function AnalyticsScreen() {
           <Text style={a.caption}>Saved screenings</Text>
         </View>
       )}
+      <View style={[a.card, s.legend]}>
+        {(['High Risk', 'Medium Risk', 'Low Risk'] as const).map(risk => (
+          <View key={risk} style={s.legendItem}>
+            <View style={[s.dot, { backgroundColor: getStatusColor(risk) }]} />
+            <Text style={a.caption}>{risk}</Text>
+          </View>
+        ))}
+      </View>
       {Object.entries(counts).map(([label, count]) => (
         <View key={label} style={[a.card, { padding: 20 }]}>
           <Text style={s.label}>{label}</Text>
@@ -54,7 +63,15 @@ export function AnalyticsScreen() {
           </Text>
           <View style={s.track}>
             <View
-              style={[s.bar, { width: `${(count / records.length) * 100}%` }]}
+              style={[
+                s.bar,
+                {
+                  width: `${(count / records.length) * 100}%`,
+                  backgroundColor: getStatusColor(
+                    getScreeningStatus(label as LesionClass, 100),
+                  ),
+                },
+              ]}
             />
           </View>
         </View>
@@ -71,6 +88,9 @@ export function AnalyticsScreen() {
   );
 }
 const s = StyleSheet.create({
+  legend: { padding: 20, gap: 12 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot: { width: 12, height: 12, borderRadius: 6 },
   total: {
     color: AccountColors.teal,
     fontSize: 40,

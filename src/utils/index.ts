@@ -40,20 +40,42 @@ export function getScreeningStatus(
   if (confidence < 70) return 'Low Confidence';
   const highConcern: LesionClass[] = ['Melanoma', 'Basal Cell Carcinoma'];
   const precancerous: LesionClass[] = ['Actinic Keratoses'];
-  if (highConcern.includes(lesionType)) return 'High Concern';
-  if (precancerous.includes(lesionType)) return 'Precancerous Indicator';
-  return 'Generally Benign';
+  if (highConcern.includes(lesionType)) return 'High Risk';
+  if (precancerous.includes(lesionType)) return 'Medium Risk';
+  return 'Low Risk';
+}
+
+/** Display older saved records using the current category names. */
+export function normalizeScreeningStatus(status: string): ScreeningStatus {
+  switch (status) {
+    case 'High Concern':
+      return 'High Risk';
+    case 'Precancerous Indicator':
+      return 'Medium Risk';
+    case 'Generally Benign':
+      return 'Low Risk';
+    case 'High Risk':
+    case 'Medium Risk':
+    case 'Low Risk':
+      return status;
+    default:
+      return 'Low Confidence';
+  }
 }
 
 /**
  * Get the status badge color for a screening status
  */
-export function getStatusColor(status: ScreeningStatus): string {
-  switch (status) {
-    case 'High Concern': return '#E53935';
-    case 'Precancerous Indicator': return '#F57C00';
-    case 'Generally Benign': return '#2E7D32';
-    default: return '#1565C0';
+export function getStatusColor(status: string): string {
+  switch (normalizeScreeningStatus(status)) {
+    case 'High Risk':
+      return '#E53935';
+    case 'Medium Risk':
+      return '#F57C00';
+    case 'Low Risk':
+      return '#2E7D32';
+    default:
+      return '#1565C0';
   }
 }
 
@@ -65,12 +87,12 @@ export function getAssessmentMessage(
   _lesionType: LesionClass,
 ): string {
   switch (status) {
-    case 'High Concern':
-      return 'Higher-Concern Classification';
-    case 'Precancerous Indicator':
-      return 'Precancerous Indicator Classification';
-    case 'Generally Benign':
-      return 'Generally Benign Classification';
+    case 'High Risk':
+      return 'High Risk Classification';
+    case 'Medium Risk':
+      return 'Medium Risk Classification';
+    case 'Low Risk':
+      return 'Low Risk Classification';
     default:
       return 'Low-Confidence Classification';
   }

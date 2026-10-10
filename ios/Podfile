@@ -15,6 +15,8 @@ if linkage != nil
 end
 
 target 'SkinSense' do
+  # The HAM10000 export contains Flex operations (Select TensorFlow Ops).
+  pod 'TensorFlowLiteSelectTfOps', '2.17.0'
   # Google Sign-In's Swift dependency needs module maps for these two pods.
   pod 'GoogleUtilities', :modular_headers => true
   pod 'RecaptchaInterop', :modular_headers => true
@@ -33,5 +35,22 @@ target 'SkinSense' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    installer.aggregate_targets.each do |aggregate|
+      aggregate.user_project.native_targets.each do |target|
+        next unless target.name == 'SkinSense'
+        target.build_configurations.each do |config|
+          # Keep the Flex delegate registration from being stripped by the linker.
+          key = 'OTHER_LDFLAGS[sdk=iphoneos*]'
+          flags = Array(config.build_settings[key] || config.build_settings['OTHER_LDFLAGS'] || '$(inherited)')
+          flex = '$(PODS_ROOT)/TensorFlowLiteSelectTfOps/Frameworks/TensorFlowLiteSelectTfOps.xcframework/ios-arm64/TensorFlowLiteSelectTfOps.framework/TensorFlowLiteSelectTfOps'
+          flag = "-force_load \"#{flex}\""
+          flags << flag unless flags.include?(flag)
+          config.build_settings[key] = flags
+          # The prebuilt Select Ops framework is for physical arm64 devices.
+          config.build_settings['OTHER_LDFLAGS'] = Array(config.build_settings['OTHER_LDFLAGS']).reject { |value| value.include?('TensorFlowLiteSelectTfOps') }
+        end
+      end
+      aggregate.user_project.save
+    end
   end
 end

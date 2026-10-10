@@ -46,6 +46,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>SkinSense uses the camera to capture skin lesion images for preliminary screening.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>DermaSight uses photo access to select skin lesion images for preliminary screening.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>RCTNewArchEnabled</key>

@@ -208,7 +208,7 @@ export function AppNavigator({
               <Stack.Screen
                 name="Result"
                 component={ResultScreen}
-                options={{ gestureEnabled: false }}
+                options={{ gestureEnabled: true }}
               />
               <Stack.Screen name="Report" component={ReportScreen} />
               <Stack.Screen name="LesionGuide" component={LesionGuideScreen} />

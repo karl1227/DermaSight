@@ -12,12 +12,22 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useIsFocused } from '@react-navigation/native';
-import { Camera, runAtTargetFps, useCameraDevice, useFrameProcessor } from 'react-native-vision-camera';
-import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
+import {
+  Camera,
+  runAtTargetFps,
+  useCameraDevice,
+  useFrameProcessor,
+} from 'react-native-vision-camera';
+import {
+  launchImageLibrary,
+  ImagePickerResponse,
+} from 'react-native-image-picker';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
+import { LineIcon } from '../components/AccountUI';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '../components/AppButton';
 import { ProgressSteps } from '../components/ProgressSteps';
 
@@ -50,9 +60,17 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [lightMode, setLightMode] = useState<LightMode>('auto');
-  const [liveQuality, setLiveQuality] = useState<LiveQuality>(INITIAL_LIVE_QUALITY);
+  const [liveQuality, setLiveQuality] =
+    useState<LiveQuality>(INITIAL_LIVE_QUALITY);
   const cameraRef = useRef<Camera>(null);
-  const device = useCameraDevice('back');
+  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>(
+    'back',
+  );
+  const device = useCameraDevice(cameraPosition);
+  const oppositeDevice = useCameraDevice(
+    cameraPosition === 'back' ? 'front' : 'back',
+  );
+  const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { resize } = useResizePlugin();
   // Shared values keep the previous live-frame signature on the frame-processor runtime.
@@ -60,7 +78,8 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const publishLiveQuality = useRunOnJS((next: LiveQuality) => {
     setLiveQuality(current =>
-      current.status === next.status && current.message === next.message &&
+      current.status === next.status &&
+      current.message === next.message &&
       Math.abs(current.brightness - next.brightness) < 1 &&
       Math.abs(current.sharpness - next.sharpness) < 0.5 &&
       Math.abs(current.motion - next.motion) < 1
@@ -69,71 +88,86 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }, []);
 
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
-    // A 64px centre crop is cheap enough for live feedback and roughly matches the guide frame.
-    runAtTargetFps(4, () => {
+  const frameProcessor = useFrameProcessor(
+    frame => {
       'worklet';
-      const pixels = resize(frame, {
-        scale: { width: 64, height: 64 },
-        pixelFormat: 'rgb',
-        dataType: 'uint8',
-      });
+      // A 64px centre crop is cheap enough for live feedback and roughly matches the guide frame.
+      runAtTargetFps(4, () => {
+        'worklet';
+        const pixels = resize(frame, {
+          scale: { width: 64, height: 64 },
+          pixelFormat: 'rgb',
+          dataType: 'uint8',
+        });
 
-      let brightnessTotal = 0;
-      let edgeTotal = 0;
-      let edgeCount = 0;
-      const signature: number[] = [];
-      const sampleStep = 8;
+        let brightnessTotal = 0;
+        let edgeTotal = 0;
+        let edgeCount = 0;
+        const signature: number[] = [];
+        const sampleStep = 8;
 
-      for (let y = 0; y < 64; y++) {
-        for (let x = 0; x < 64; x++) {
-          const index = (y * 64 + x) * 3;
-          const value = 0.299 * pixels[index] + 0.587 * pixels[index + 1] + 0.114 * pixels[index + 2];
-          brightnessTotal += value;
+        for (let y = 0; y < 64; y++) {
+          for (let x = 0; x < 64; x++) {
+            const index = (y * 64 + x) * 3;
+            const value =
+              0.299 * pixels[index] +
+              0.587 * pixels[index + 1] +
+              0.114 * pixels[index + 2];
+            brightnessTotal += value;
 
-          if (x < 63 && y < 63) {
-            const right = (y * 64 + x + 1) * 3;
-            const below = ((y + 1) * 64 + x) * 3;
-            const rightValue = 0.299 * pixels[right] + 0.587 * pixels[right + 1] + 0.114 * pixels[right + 2];
-            const belowValue = 0.299 * pixels[below] + 0.587 * pixels[below + 1] + 0.114 * pixels[below + 2];
-            edgeTotal += Math.abs(value - rightValue) + Math.abs(value - belowValue);
-            edgeCount += 2;
+            if (x < 63 && y < 63) {
+              const right = (y * 64 + x + 1) * 3;
+              const below = ((y + 1) * 64 + x) * 3;
+              const rightValue =
+                0.299 * pixels[right] +
+                0.587 * pixels[right + 1] +
+                0.114 * pixels[right + 2];
+              const belowValue =
+                0.299 * pixels[below] +
+                0.587 * pixels[below + 1] +
+                0.114 * pixels[below + 2];
+              edgeTotal +=
+                Math.abs(value - rightValue) + Math.abs(value - belowValue);
+              edgeCount += 2;
+            }
+
+            if (x % sampleStep === 0 && y % sampleStep === 0)
+              signature.push(value);
           }
-
-          if (x % sampleStep === 0 && y % sampleStep === 0) signature.push(value);
         }
-      }
 
-      const brightness = brightnessTotal / (64 * 64);
-      const sharpness = edgeTotal / edgeCount;
-      const previous = previousSignature.value;
-      let motion = 0;
-      if (previous.length === signature.length) {
-        for (let i = 0; i < signature.length; i++) motion += Math.abs(signature[i] - previous[i]);
-        motion /= signature.length;
-      }
-      previousSignature.value = signature;
+        const brightness = brightnessTotal / (64 * 64);
+        const sharpness = edgeTotal / edgeCount;
+        const previous = previousSignature.value;
+        let motion = 0;
+        if (previous.length === signature.length) {
+          for (let i = 0; i < signature.length; i++)
+            motion += Math.abs(signature[i] - previous[i]);
+          motion /= signature.length;
+        }
+        previousSignature.value = signature;
 
-      let message = 'Ready to capture';
-      let status: LiveQuality['status'] = 'ready';
-      if (brightness < 65) {
-        status = 'warning';
-        message = 'More light needed';
-      } else if (brightness > 205) {
-        status = 'warning';
-        message = 'Reduce glare or direct light';
-      } else if (sharpness < 10) {
-        status = 'warning';
-        message = 'Move closer and let the camera focus';
-      } else if (previous.length > 0 && motion > 16) {
-        status = 'warning';
-        message = 'Hold the phone steady';
-      }
+        let message = 'Ready to capture';
+        let status: LiveQuality['status'] = 'ready';
+        if (brightness < 65) {
+          status = 'warning';
+          message = 'More light needed';
+        } else if (brightness > 205) {
+          status = 'warning';
+          message = 'Reduce glare or direct light';
+        } else if (sharpness < 10) {
+          status = 'warning';
+          message = 'Move closer and let the camera focus';
+        } else if (previous.length > 0 && motion > 16) {
+          status = 'warning';
+          message = 'Hold the phone steady';
+        }
 
-      publishLiveQuality({ brightness, sharpness, motion, status, message });
-    });
-  }, [resize, previousSignature, publishLiveQuality]);
+        publishLiveQuality({ brightness, sharpness, motion, status, message });
+      });
+    },
+    [resize, previousSignature, publishLiveQuality],
+  );
 
   useEffect(() => {
     const status = Camera.getCameraPermissionStatus();
@@ -148,8 +182,10 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     width?: number;
     height?: number;
     fileSize?: number;
+    entry?: 'camera' | 'gallery';
   }) => {
     navigation.navigate('ConfirmImage', {
+      imageEntry: image.entry ?? 'camera',
       patientInfo,
       symptoms,
       imageUri: image.uri,
@@ -168,7 +204,10 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     setLoading(false);
     if (response.didCancel) return;
     if (response.errorCode) {
-      Alert.alert('Error', response.errorMessage ?? 'Could not access gallery.');
+      Alert.alert(
+        'Gallery Unavailable',
+        'Could not open your photos. Check photo access in Settings and try again.',
+      );
       return;
     }
     const asset = response.assets?.[0];
@@ -178,7 +217,10 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }
     navigateToConfirm({
       uri: asset.uri,
-      path: asset.originalPath ?? asset.uri,
+      // Use the picker-provided accessible URI, not a potentially inaccessible
+      // original library path under Android scoped storage or iOS Photos.
+      path: asset.uri,
+      entry: 'gallery',
       base64: asset.base64,
       type: asset.type,
       width: asset.width,
@@ -192,7 +234,10 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     const granted = status === 'granted';
     setHasPermission(granted);
     if (!granted) {
-      Alert.alert('Permission Denied', 'Enable camera access in Settings to use guided capture.');
+      Alert.alert(
+        'Permission Denied',
+        'Enable camera access in Settings to use guided capture.',
+      );
     }
     return granted;
   };
@@ -223,14 +268,17 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }
 
     if (!cameraRef.current) {
-      Alert.alert('Camera Not Ready', 'Please wait for the camera preview to load.');
+      Alert.alert(
+        'Camera Not Ready',
+        'Please wait for the camera preview to load.',
+      );
       return;
     }
 
     try {
       setLoading(true);
       const photo = await cameraRef.current.takePhoto({
-        flash: lightMode,
+        flash: device?.hasFlash ? lightMode : 'off',
         enableShutterSound: true,
       });
       setLoading(false);
@@ -243,7 +291,8 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
         height: photo.height,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not capture image.';
+      const message =
+        err instanceof Error ? err.message : 'Could not capture image.';
       Alert.alert('Capture Failed', message);
     } finally {
       setLoading(false);
@@ -253,19 +302,41 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleGallery = async () => {
     const granted = await requestGalleryPermission();
     if (!granted) {
-      Alert.alert('Permission Denied', 'Enable photo library access in Settings to use this feature.');
+      Alert.alert(
+        'Permission Denied',
+        'Enable photo library access in Settings to use this feature.',
+      );
       return;
     }
     setLoading(true);
-    launchImageLibrary(
-      { mediaType: 'photo', quality: 0.9, selectionLimit: 1, includeBase64: false, includeExtra: true },
-      handleImageResult,
-    );
+    try {
+      const response = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.9,
+        selectionLimit: 1,
+        includeBase64: false,
+        // Width/height/URI are already supplied without accessing extra Photos
+        // metadata. Avoid requesting broad library access for selected images.
+        includeExtra: false,
+      });
+      handleImageResult(response);
+    } catch {
+      Alert.alert(
+        'Gallery Unavailable',
+        'Could not open your photos. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const canShowCamera = hasPermission && device;
   const supportsTorch = Boolean(device?.hasTorch);
-  const nextLightMode: Record<LightMode, LightMode> = { auto: 'on', on: 'off', off: 'auto' };
+  const nextLightMode: Record<LightMode, LightMode> = {
+    auto: 'on',
+    on: 'off',
+    off: 'auto',
+  };
   const lightLabel: Record<LightMode, string> = {
     auto: 'Auto',
     on: 'ON',
@@ -278,17 +349,29 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Guided Image Capture</Text>
+          <Text style={styles.headerTitle}>Skin Scan</Text>
           {supportsTorch ? (
             <TouchableOpacity
               onPress={() => setLightMode(mode => nextLightMode[mode])}
-              style={[styles.torchBtn, lightMode !== 'off' && styles.torchBtnActive]}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={[styles.torchText, lightMode !== 'off' && styles.torchTextActive]}>
-                {lightMode === 'auto' ? '🔦 Light Auto' : `💡 Light ${lightLabel[lightMode]}`}
+              style={[
+                styles.torchBtn,
+                lightMode !== 'off' && styles.torchBtnActive,
+              ]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text
+                style={[
+                  styles.torchText,
+                  lightMode !== 'off' && styles.torchTextActive,
+                ]}
+              >
+                {`Light ${lightLabel[lightMode]}`}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -298,12 +381,15 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
         <ProgressSteps steps={STEPS} currentStep={2} />
       </View>
 
-      <View style={styles.content}>
-        {/* Lighting guidance badge */}
-        <View style={styles.lightingGuideBanner}>
-          <Text style={styles.lightingGuideIcon}>💡</Text>
-          <Text style={styles.lightingGuideText}>
-            Ensure even, bright light with no harsh shadows or direct glare.
+      <View
+        style={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+        ]}
+      >
+        <View style={styles.patientStrip}>
+          <Text style={styles.patientStripText} numberOfLines={1}>
+            {patientInfo.fullName} • {patientInfo.lesionLocation}
           </Text>
         </View>
 
@@ -314,7 +400,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
               style={StyleSheet.absoluteFill}
               device={device}
               isActive={isFocused}
-              torch={lightMode !== 'off' ? 'on' : 'off'}
+              torch={supportsTorch && lightMode !== 'off' ? 'on' : 'off'}
               photo
               frameProcessor={frameProcessor}
             />
@@ -323,15 +409,21 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
               {!device ? (
                 <>
                   <ActivityIndicator size="large" color={Colors.primary} />
-                  <Text style={styles.fallbackText}>Loading back camera...</Text>
+                  <Text style={styles.fallbackText}>Loading camera...</Text>
                 </>
               ) : (
                 <>
-                  <Text style={styles.fallbackTitle}>Camera permission needed</Text>
+                  <Text style={styles.fallbackTitle}>
+                    Camera permission needed
+                  </Text>
                   <Text style={styles.fallbackText}>
                     Allow camera access to use live guided capture.
                   </Text>
-                  <AppButton label="Allow Camera" onPress={requestCameraPermission} size="md" />
+                  <AppButton
+                    label="Allow Camera"
+                    onPress={requestCameraPermission}
+                    size="md"
+                  />
                 </>
               )}
             </View>
@@ -347,7 +439,9 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             <View style={styles.bottomGuide}>
-              <Text style={styles.guideText}>Place lesion inside frame & hold steady</Text>
+              <Text style={styles.guideText}>
+                Place lesion inside frame & hold steady
+              </Text>
             </View>
 
             <View
@@ -356,35 +450,62 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
                 liveQuality.status === 'ready'
                   ? styles.liveQualityReady
                   : liveQuality.status === 'warning'
-                    ? styles.liveQualityWarning
-                    : styles.liveQualityChecking,
-              ]}>
+                  ? styles.liveQualityWarning
+                  : styles.liveQualityChecking,
+              ]}
+            >
               <Text style={styles.liveQualityText}>{liveQuality.message}</Text>
             </View>
           </View>
-        </View>
-
-        <View style={styles.patientStrip}>
-          <Text style={styles.patientStripText} numberOfLines={1}>
-            {patientInfo.fullName} • {patientInfo.age}y • {patientInfo.sex} • {patientInfo.lesionLocation}
-          </Text>
-        </View>
-
-        <View style={styles.actionsContainer}>
-          <AppButton
-            label={liveQuality.status === 'ready' ? 'Capture Guided Image' : 'Capture Anyway'}
-            onPress={handleCapture}
-            size="lg"
-            loading={loading}
-            style={styles.captureBtn}
-          />
-          <AppButton
-            label="Upload from Gallery"
-            onPress={handleGallery}
-            variant="outline"
-            size="md"
-            loading={loading}
-          />
+          <View style={styles.captureControls}>
+            <TouchableOpacity
+              style={styles.smallControl}
+              onPress={handleGallery}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Open gallery"
+            >
+              <LineIcon name="gallery" color={Colors.primary} size={27} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.captureControl,
+                (loading || !canShowCamera) && styles.controlDisabled,
+              ]}
+              onPress={handleCapture}
+              disabled={loading || !canShowCamera}
+              accessibilityRole="button"
+              accessibilityLabel="Capture image"
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.white} size="large" />
+              ) : (
+                <LineIcon name="camera" color={Colors.white} size={38} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.smallControl,
+                (!oppositeDevice || loading) && styles.controlDisabled,
+              ]}
+              disabled={!oppositeDevice || loading}
+              accessibilityRole="button"
+              accessibilityLabel={
+                cameraPosition === 'back'
+                  ? 'Switch to front camera'
+                  : 'Switch to back camera'
+              }
+              onPress={() => {
+                setCameraPosition(position =>
+                  position === 'back' ? 'front' : 'back',
+                );
+                previousSignature.value = [];
+                setLiveQuality(INITIAL_LIVE_QUALITY);
+              }}
+            >
+              <LineIcon name="switchCamera" color={Colors.primary} size={27} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -407,8 +528,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.sm,
   },
-  backText: { fontSize: Typography.base, color: 'rgba(255,255,255,0.9)', fontWeight: Typography.medium },
-  headerTitle: { fontSize: Typography.lg, fontWeight: Typography.bold, color: Colors.white },
+  backText: {
+    fontSize: Typography.base,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: Typography.medium,
+  },
+  headerTitle: {
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    color: Colors.white,
+  },
   headerSpacer: { width: 40 },
   torchBtn: {
     paddingHorizontal: Spacing.sm,
@@ -451,17 +580,17 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.lg,
     justifyContent: 'space-between',
   },
   cameraShell: {
     flex: 1,
-    minHeight: 280,
+    minHeight: 220,
     borderRadius: Radius.xl,
     overflow: 'hidden',
     backgroundColor: Colors.primaryDark,
-    marginBottom: Spacing.sm,
+    marginBottom: 0,
     position: 'relative',
     ...Shadow.md,
   },
@@ -495,6 +624,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.base,
+    paddingBottom: 130,
   },
   scanFrame: {
     width: 220,
@@ -504,11 +634,41 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: Spacing.md,
   },
-  corner: { position: 'absolute', width: 32, height: 32, borderColor: Colors.accent, borderWidth: 3 },
-  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 6 },
-  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 6 },
-  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 6 },
-  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 6 },
+  corner: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderColor: Colors.accent,
+    borderWidth: 3,
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 6,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 6,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 6,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 6,
+  },
   centerDot: {
     width: 8,
     height: 8,
@@ -536,10 +696,24 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderWidth: 1,
   },
-  liveQualityChecking: { backgroundColor: 'rgba(15, 23, 42, 0.78)', borderColor: 'rgba(255,255,255,0.35)' },
-  liveQualityReady: { backgroundColor: 'rgba(5, 150, 105, 0.92)', borderColor: '#A7F3D0' },
-  liveQualityWarning: { backgroundColor: 'rgba(180, 83, 9, 0.92)', borderColor: '#FDE68A' },
-  liveQualityText: { fontSize: Typography.xs, color: Colors.white, fontWeight: Typography.bold, textAlign: 'center' },
+  liveQualityChecking: {
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  liveQualityReady: {
+    backgroundColor: 'rgba(5, 150, 105, 0.92)',
+    borderColor: '#A7F3D0',
+  },
+  liveQualityWarning: {
+    backgroundColor: 'rgba(180, 83, 9, 0.92)',
+    borderColor: '#FDE68A',
+  },
+  liveQualityText: {
+    fontSize: Typography.xs,
+    color: Colors.white,
+    fontWeight: Typography.bold,
+    textAlign: 'center',
+  },
   patientStrip: {
     backgroundColor: Colors.primaryUltraLight,
     borderRadius: Radius.md,
@@ -555,10 +729,36 @@ const styles = StyleSheet.create({
     fontWeight: Typography.semiBold,
     textAlign: 'center',
   },
-  actionsContainer: {
-    width: '100%',
+  captureControls: {
+    position: 'absolute',
+    bottom: 24,
+    left: 24,
+    right: 24,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
   },
-  captureBtn: {
-    marginBottom: Spacing.sm,
+  smallControl: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primaryUltraLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
   },
+  captureControl: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginBottom: 22,
+    backgroundColor: Colors.primary,
+    borderWidth: 4,
+    borderColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.md,
+  },
+  controlDisabled: { opacity: 0.5 },
 });
