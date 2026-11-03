@@ -1,0 +1,34 @@
+{
+  "public": true,
+  "isic_id": "ISIC_0000002",
+  "copyright_license": "CC-0",
+  "attribution": "Anonymous",
+  "files": {
+    "full": {
+      "url": "https://isic-archive.s3.amazonaws.com/images/ISIC_0000002.jpg",
+      "size": 59201
+    },
+    "thumbnail_256": {
+      "url": "https://isic-archive.s3.amazonaws.com/thumbnails/ISIC_0000002_thumbnail.jpg",
+      "size": 6249
+    }
+  },
+  "metadata": {
+    "acquisition": {
+      "pixels_x": 1022,
+      "pixels_y": 767,
+      "image_type": "dermoscopic"
+    },
+    "clinical": {
+      "concomitant_biopsy": true,
+      "sex": "female",
+      "anatom_site_1": "Upper extremity",
+      "diagnosis_1": "Malignant",
+      "diagnosis_2": "Malignant melanocytic proliferations (Melanoma)",
+      "diagnosis_3": "Melanoma, NOS",
+      "diagnosis_confirm_type": "histopathology",
+      "melanocytic": true,
+      "age_approx": 60
+    }
+  }
+}

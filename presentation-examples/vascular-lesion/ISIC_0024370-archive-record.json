@@ -1,0 +1,34 @@
+{
+  "public": true,
+  "isic_id": "ISIC_0024370",
+  "copyright_license": "CC-BY-NC",
+  "attribution": "MILK study team",
+  "files": {
+    "full": {
+      "url": "https://isic-archive.s3.amazonaws.com/images/ISIC_0024370.jpg",
+      "size": 22162
+    },
+    "thumbnail_256": {
+      "url": "https://isic-archive.s3.amazonaws.com/thumbnails/ISIC_0024370_thumbnail.jpg",
+      "size": 4152
+    }
+  },
+  "metadata": {
+    "acquisition": {
+      "pixels_x": 600,
+      "pixels_y": 450,
+      "image_type": "dermoscopic"
+    },
+    "clinical": {
+      "concomitant_biopsy": false,
+      "sex": "male",
+      "anatom_site_1": "Trunk",
+      "diagnosis_1": "Benign",
+      "diagnosis_2": "Benign soft tissue proliferations - Vascular",
+      "diagnosis_confirm_type": "single image expert consensus",
+      "melanocytic": false,
+      "age_approx": 55,
+      "lesion_id": "IL_0570567"
+    }
+  }
+}

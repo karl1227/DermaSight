@@ -7,6 +7,32 @@ import type { RootStackParamList, TabParamList } from '../types';
 import { secureId } from '../utils/secureId';
 
 type Navigation = { dispatch: (action: NavigationAction) => void };
+type BackNavigation = Navigation & {
+  canGoBack: () => boolean;
+  goBack: () => void;
+};
+
+export function backToSettings(navigation: BackNavigation) {
+  if (navigation.canGoBack()) {
+    navigation.goBack();
+    return;
+  }
+  resetStack(navigation, {
+    index: 1,
+    routes: [
+      { name: 'MainTabs', params: { screen: 'Profile' } },
+      { name: 'Settings' },
+    ],
+  });
+}
+
+export function backToDashboard(
+  navigation: BackNavigation,
+  screen: keyof TabParamList = 'Home',
+) {
+  if (navigation.canGoBack()) navigation.goBack();
+  else returnToDashboard(navigation, screen);
+}
 function resetStack(
   navigation: Navigation,
   state: Parameters<NavigationProp<RootStackParamList>['reset']>[0],

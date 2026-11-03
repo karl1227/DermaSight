@@ -1,3 +1,4 @@
+import { backToDashboard } from '../navigation/screeningFlow';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -114,7 +115,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <AccountScreen>
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+        onPress={() => backToDashboard(navigation, 'Profile')}
         style={a.back}
         accessibilityRole="button"
         accessibilityLabel="Back"

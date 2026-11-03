@@ -101,7 +101,14 @@ test('guest adoption rolls back on failure, preserves screening IDs/images, and 
   const db = require('../src/database/database');
   const id = await db.createGuestSession();
   const guest = { kind: 'guest', id };
-  await db.insertScreening(record('scan-1'), guest);
+  await db.insertScreening(
+    {
+      ...record('scan-1'),
+      occupation: 'Transport Workers',
+      sunburn_history: 0,
+    },
+    guest,
+  );
   await db.insertScreening(record('scan-2'), guest);
   mockFailMigration = true;
   await expect(db.activateAccount(user('a'), id)).rejects.toThrow('disk');
@@ -113,6 +120,14 @@ test('guest adoption rolls back on failure, preserves screening IDs/images, and 
   await db.activateAccount(user('a'), id);
   const records = await db.getAllScreenings({ kind: 'user', id: 'a' });
   expect(records).toHaveLength(2);
+  expect(records.find(r => r.screening_id === 'scan-1')).toMatchObject({
+    occupation: 'Transport Workers',
+    sunburn_history: 0,
+  });
+  expect(records.find(r => r.screening_id === 'scan-2')).toMatchObject({
+    occupation: null,
+    sunburn_history: null,
+  });
   expect(records.map(r => r.screening_id).sort()).toEqual(['scan-1', 'scan-2']);
   expect(
     records.every(

@@ -1,0 +1,35 @@
+{
+  "public": true,
+  "isic_id": "ISIC_0024318",
+  "copyright_license": "CC-BY-NC",
+  "attribution": "MILK study team",
+  "files": {
+    "full": {
+      "url": "https://isic-archive.s3.amazonaws.com/images/ISIC_0024318.jpg",
+      "size": 25896
+    },
+    "thumbnail_256": {
+      "url": "https://isic-archive.s3.amazonaws.com/thumbnails/ISIC_0024318_thumbnail.jpg",
+      "size": 5853
+    }
+  },
+  "metadata": {
+    "acquisition": {
+      "pixels_x": 600,
+      "pixels_y": 450,
+      "image_type": "dermoscopic"
+    },
+    "clinical": {
+      "concomitant_biopsy": false,
+      "sex": "female",
+      "anatom_site_1": "Lower extremity",
+      "diagnosis_1": "Benign",
+      "diagnosis_2": "Benign soft tissue proliferations - Fibro-histiocytic",
+      "diagnosis_3": "Dermatofibroma",
+      "diagnosis_confirm_type": "single image expert consensus",
+      "melanocytic": false,
+      "age_approx": 65,
+      "lesion_id": "IL_9624462"
+    }
+  }
+}

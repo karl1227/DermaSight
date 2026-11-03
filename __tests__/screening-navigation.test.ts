@@ -1,4 +1,4 @@
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, StackActions } from '@react-navigation/native';
 import { StackRouter, TabRouter } from '@react-navigation/routers';
 import {
   startNewScreening,
@@ -6,13 +6,28 @@ import {
   showSavedReport,
   showScreeningResult,
   retakeScreeningImage,
+  backToSettings,
+  backToDashboard,
 } from '../src/navigation/screeningFlow';
 import { RootStackParamList } from '../src/types';
 jest.mock('../src/utils/secureId', () => ({
   secureId: () => 'new-screening-id',
 }));
 const options = {
-  routeNames: ['MainTabs', 'PatientInfo', 'Camera', 'Result', 'Report'],
+  routeNames: [
+    'MainTabs',
+    'PatientInfo',
+    'SymptomChecklist',
+    'Camera',
+    'ConfirmImage',
+    'AIClassification',
+    'Result',
+    'Report',
+    'Settings',
+    'SettingsPrivacyConsent',
+    'SettingsMedicalDisclaimer',
+    'About',
+  ],
   routeParamList: {},
   routeGetIdList: {},
 };
@@ -105,4 +120,62 @@ test('retake opens Camera with retained context and a fresh assessment ID', () =
   expect(result.patientInfo.screeningId).toBe('old-id');
   flow.back();
   expect(flow.state().routes).toHaveLength(1);
+});
+
+test('screening Back retraces analysis, review, camera, symptoms, information and Home', () => {
+  const flow = setup();
+  startNewScreening(flow.navigation);
+  for (const name of [
+    'SymptomChecklist',
+    'Camera',
+    'ConfirmImage',
+    'AIClassification',
+  ])
+    flow.navigation.dispatch(StackActions.push(name));
+  for (const expected of [
+    'ConfirmImage',
+    'Camera',
+    'SymptomChecklist',
+    'PatientInfo',
+    'MainTabs',
+  ]) {
+    flow.back();
+    expect(flow.state().routes.at(-1)?.name).toBe(expected);
+  }
+});
+
+test.each(['SettingsPrivacyConsent', 'SettingsMedicalDisclaimer', 'About'])(
+  'Profile → Settings → %s returns through Settings to Profile',
+  name => {
+    const flow = setup();
+    returnToDashboard(flow.navigation, 'Profile');
+    flow.navigation.dispatch(StackActions.push('Settings'));
+    flow.navigation.dispatch(StackActions.push(name));
+    backToSettings({
+      ...flow.navigation,
+      canGoBack: () => true,
+      goBack: flow.back,
+    });
+    expect(flow.state().routes.at(-1)?.name).toBe('Settings');
+    flow.back();
+    expect(flow.state().routes[0].params).toEqual({ screen: 'Profile' });
+  },
+);
+
+test('orphaned policy and Settings screens have designated fallbacks', () => {
+  const flow = setup();
+  const navigation = {
+    ...flow.navigation,
+    canGoBack: () => false,
+    goBack: jest.fn(),
+  };
+  backToSettings(navigation);
+  expect(flow.state().routes.map(route => route.name)).toEqual([
+    'MainTabs',
+    'Settings',
+  ]);
+  expect(flow.state().routes[0].params).toEqual({ screen: 'Profile' });
+  backToDashboard(navigation, 'Profile');
+  expect(flow.state().routes).toHaveLength(1);
+  expect(flow.state().routes[0].params).toEqual({ screen: 'Profile' });
 });

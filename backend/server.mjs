@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { servePublicPage } from './public-pages.mjs';
 import { verifyGoogle } from './google.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -52,6 +53,7 @@ const server = http.createServer(async (req, res) => {
     ) {
       throw new AuthError(400, 'HTTPS is required.');
     }
+    if (servePublicPage(req, res)) return;
     const token = req.headers.authorization?.startsWith('Bearer ')
       ? req.headers.authorization.slice(7)
       : '';

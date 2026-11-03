@@ -8,41 +8,21 @@ import {
   TouchableOpacity,
   StatusBar,
   Animated,
-  ActivityIndicator,
+  AccessibilityInfo,
+  AppState,
+  Easing,
+  useWindowDimensions,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import {
-  RootStackParamList,
-  LesionClass,
-  ClassificationResult,
-} from '../types';
-import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
+import { RootStackParamList, ClassificationResult } from '../types';
+import { Colors, Typography, Spacing, Radius } from '../theme';
 import { runInference } from '../services/tfliteService';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'AIClassification'>;
   route: RouteProp<RootStackParamList, 'AIClassification'>;
 };
-
-const LESION_CLASSES: LesionClass[] = [
-  'Melanoma',
-  'Basal Cell Carcinoma',
-  'Actinic Keratoses',
-  'Melanocytic Nevi',
-  'Benign Keratosis',
-  'Dermatofibroma',
-  'Vascular Lesions',
-];
-
-const INFERENCE_STEPS = [
-  { id: 's1', label: 'Loading preprocessed image tensor' },
-  { id: 's2', label: 'Running CNN EfficientNet inference' },
-  { id: 's3', label: 'Comparing features with 7 HAM10000 classes' },
-  { id: 's4', label: 'Reading trained model probabilities' },
-  { id: 's5', label: 'Evaluating confidence threshold' },
-  { id: 's6', label: 'Generating preliminary screening result' },
-];
 
 export const AIClassificationScreen: React.FC<Props> = ({
   navigation,
@@ -60,61 +40,93 @@ export const AIClassificationScreen: React.FC<Props> = ({
   const sourceImagePath = imagePath ?? imageUri;
 
   const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
-  const [activeClass, setActiveClass] = useState<number>(-1);
   const [classificationResult, setClassificationResult] =
     useState<ClassificationResult | null>(null);
-  const [inferenceDurationMs, setInferenceDurationMs] = useState<number | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const { width, height } = useWindowDimensions();
+  const diameter = Math.max(180, Math.min(width - 100, height * 0.36, 320));
+  const circleSize = {
+    width: diameter,
+    height: diameter,
+    borderRadius: diameter / 2,
+  };
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [foreground, setForeground] = useState(
+    AppState.currentState === 'active',
+  );
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(enabled => {
+        if (active) setReduceMotion(enabled);
+      })
+      .catch(() => {});
+    const motion = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+    const app = AppState.addEventListener('change', state =>
+      setForeground(state === 'active'),
+    );
+    return () => {
+      active = false;
+      motion.remove();
+      app.remove();
+    };
+  }, []);
+
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    rotateAnim.setValue(0);
+    pulseAnim.setValue(0);
+    if (error || reduceMotion || !foreground) return;
     const spinner = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 1800,
+        duration: 4200,
+        easing: Easing.linear,
         useNativeDriver: true,
       }),
     );
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     spinner.start();
-    return () => spinner.stop();
-  }, [rotateAnim]);
+    pulse.start();
+    return () => {
+      spinner.stop();
+      pulse.stop();
+    };
+  }, [rotateAnim, pulseAnim, error, reduceMotion, foreground]);
 
   useEffect(() => {
     let cancelled = false;
 
-    const setProgressValue = (value: number) => {
-      setProgress(value);
-      Animated.timing(progressAnim, {
-        toValue: value / 100,
-        duration: 250,
-        useNativeDriver: false,
-      }).start();
-    };
-
     const runClassification = async () => {
       try {
         setProgress(0);
-        progressAnim.setValue(0);
-        setCompletedSteps([]);
         setClassificationResult(null);
-        setInferenceDurationMs(null);
         setError(null);
-        setCurrentStep(0);
-        setActiveClass(-1);
-        setProgressValue(10);
-        setCompletedSteps(['s1']);
+        setProgress(10);
 
-        setCurrentStep(1);
-        setActiveClass(0);
-        setProgressValue(35);
+        setProgress(35);
 
-        const inferenceStartedAt = Date.now();
         const result = await runInference(
           {
             base64: imageData,
@@ -126,18 +138,13 @@ export const AIClassificationScreen: React.FC<Props> = ({
         );
 
         if (cancelled) return;
-        setInferenceDurationMs(Date.now() - inferenceStartedAt);
-        setCompletedSteps(INFERENCE_STEPS.map(step => step.id));
-        setCurrentStep(INFERENCE_STEPS.length - 1);
-        setProgressValue(100);
+        setProgress(100);
         setClassificationResult(result);
-        setActiveClass(-1);
       } catch (err) {
         if (cancelled) return;
         const message =
           err instanceof Error ? err.message : 'Unknown runtime error';
         setError(`Classification failed: ${message}`);
-        setActiveClass(-1);
       }
     };
 
@@ -180,102 +187,73 @@ export const AIClassificationScreen: React.FC<Props> = ({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.progressCenter}>
-          <View style={styles.progressCircleOuter}>
+          <View
+            style={[
+              styles.progressStage,
+              { width: diameter + 64, height: diameter + 64 },
+            ]}
+          >
             <Animated.View
+              pointerEvents="none"
               style={[
-                styles.progressSpinner,
-                { transform: [{ rotate: spin }] },
+                styles.halo,
+                circleSize,
+                {
+                  opacity: pulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.18, 0.4],
+                  }),
+                  transform: [
+                    {
+                      scale: pulseAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1.08, 1.2],
+                      }),
+                    },
+                  ],
+                },
               ]}
-            >
-              <View style={styles.spinnerArc} />
-            </Animated.View>
-            <View style={styles.progressInner}>
-              <Text style={styles.progressPercent}>{progress}%</Text>
-              <Text style={styles.progressLabel}>
-                {classificationResult ? 'Complete' : 'Processing'}
-              </Text>
+            />
+            <View
+              pointerEvents="none"
+              style={[
+                styles.orbit,
+                {
+                  width: diameter + 36,
+                  height: diameter + 36,
+                  borderRadius: (diameter + 36) / 2,
+                },
+              ]}
+            />
+            <View style={[styles.progressCircleOuter, circleSize]}>
+              <Animated.View
+                style={[
+                  styles.progressSpinner,
+                  circleSize,
+                  { transform: [{ rotate: spin }] },
+                ]}
+              >
+                <View style={[styles.spinnerArc, circleSize]} />
+              </Animated.View>
+              <View style={styles.progressInner}>
+                <Text
+                  style={[
+                    styles.progressPercent,
+                    { fontSize: diameter * 0.23 },
+                  ]}
+                >
+                  {progress}%
+                </Text>
+                <Text style={styles.progressLabel}>
+                  {error
+                    ? 'Unable to analyze'
+                    : classificationResult
+                    ? 'Complete'
+                    : 'Processing'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-
-        <View style={styles.chipsSection}>
-          <Text style={styles.chipsTitle}>HAM10000 Classes</Text>
-          <View style={styles.chipsRow}>
-            {LESION_CLASSES.map((cls, idx) => (
-              <View
-                key={cls}
-                style={[
-                  styles.chip,
-                  idx === activeClass && styles.chipActive,
-                  classificationResult
-                    ? styles.chipScanned
-                    : completedSteps.length > 0 &&
-                      idx < activeClass &&
-                      styles.chipScanned,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    idx === activeClass && styles.chipTextActive,
-                  ]}
-                >
-                  {cls}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.stepsCard}>
-          {INFERENCE_STEPS.map((step, idx) => {
-            const isCompleted = completedSteps.includes(step.id);
-            const isActive = idx === currentStep && !isCompleted;
-            return (
-              <View
-                key={step.id}
-                style={[
-                  styles.stepRow,
-                  isActive && styles.stepActive,
-                  isCompleted && styles.stepDone,
-                  idx === INFERENCE_STEPS.length - 1 && styles.stepLast,
-                ]}
-              >
-                <Text style={styles.stepIcon}>
-                  {isCompleted ? 'OK' : isActive ? '>' : 'o'}
-                </Text>
-                <Text
-                  style={[
-                    styles.stepText,
-                    isCompleted && styles.stepTextDone,
-                    isActive && styles.stepTextActive,
-                  ]}
-                >
-                  {step.label}
-                </Text>
-                {isActive && (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                )}
-              </View>
-            );
-          })}
-        </View>
-
-        <View style={styles.modelCard}>
-          <Text style={styles.modelCardTitle}>
-            {classificationResult
-              ? 'CNN Analysis Complete'
-              : 'Available CNN Model'}
-          </Text>
-          <Text style={styles.modelCardText}>
-            {classificationResult
-              ? `The EfficientNet TensorFlow Lite model processed the captured image locally on this device${
-                  inferenceDurationMs !== null
-                    ? ` in ${(inferenceDurationMs / 1000).toFixed(2)} seconds`
-                    : ''
-                }.`
-              : 'EfficientNet TensorFlow Lite model trained for the supported HAM10000 lesion classes.'}
-          </Text>
         </View>
 
         {error && (
@@ -323,13 +301,6 @@ export const AIClassificationScreen: React.FC<Props> = ({
             </Text>
           </TouchableOpacity>
         )}
-
-        <View style={styles.footerNote}>
-          <Text style={styles.footerNoteText}>
-            All inference runs locally on device. No data is transmitted to any
-            server.
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -364,18 +335,25 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     paddingBottom: Spacing.xxxl,
     alignItems: 'center',
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   progressCenter: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xl,
     marginTop: Spacing.base,
   },
+  progressStage: { alignItems: 'center', justifyContent: 'center' },
+  halo: { position: 'absolute', backgroundColor: Colors.primaryLight },
+  orbit: { position: 'absolute', borderWidth: 1, borderColor: Colors.border },
   progressCircleOuter: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: Colors.primaryUltraLight,
-    borderWidth: 3,
+    backgroundColor: Colors.white,
+    borderWidth: 2,
     borderColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
@@ -403,105 +381,17 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   progressLabel: {
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
-    fontWeight: Typography.medium,
-  },
-  chipsSection: {
-    width: '100%',
-    marginBottom: Spacing.xl,
-  },
-  chipsTitle: {
-    fontSize: Typography.sm,
-    fontWeight: Typography.semiBold,
+    fontSize: Typography.base,
     color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  chip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    marginRight: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  chipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-    ...Shadow.sm,
-  },
-  chipScanned: {
-    backgroundColor: Colors.primaryUltraLight,
-    borderColor: Colors.primaryLight,
-  },
-  chipText: {
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
     fontWeight: Typography.medium,
+    marginTop: Spacing.sm,
   },
-  chipTextActive: {
-    color: Colors.white,
-    fontWeight: Typography.semiBold,
-  },
-  stepsCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    width: '100%',
-    marginBottom: Spacing.base,
-    ...Shadow.card,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  stepLast: { borderBottomWidth: 0 },
-  stepActive: { backgroundColor: Colors.primaryUltraLight },
-  stepDone: { backgroundColor: Colors.successLight },
-  stepIcon: { fontSize: Typography.xs, marginRight: Spacing.md, width: 22 },
-  stepText: {
-    flex: 1,
-    fontSize: Typography.sm,
-    color: Colors.textMuted,
-    fontWeight: Typography.medium,
-  },
-  stepTextActive: { color: Colors.primary, fontWeight: Typography.semiBold },
-  stepTextDone: { color: Colors.success },
   errorCard: {
     backgroundColor: Colors.dangerLight,
     borderRadius: Radius.md,
     padding: Spacing.base,
     width: '100%',
     marginBottom: Spacing.base,
-  },
-  modelCard: {
-    backgroundColor: Colors.primaryUltraLight,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-    marginBottom: Spacing.base,
-  },
-  modelCardTitle: {
-    fontSize: Typography.sm,
-    color: Colors.primary,
-    fontWeight: Typography.bold,
-    marginBottom: 4,
-  },
-  modelCardText: {
-    fontSize: Typography.xs,
-    color: Colors.textSecondary,
-    lineHeight: Typography.xs * 1.6,
   },
   errorText: {
     fontSize: Typography.sm,
@@ -535,8 +425,10 @@ const styles = StyleSheet.create({
   },
   continueBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
+    borderRadius: Radius.xl,
+    minHeight: 56,
+    justifyContent: 'center',
+    paddingVertical: Spacing.base,
     paddingHorizontal: Spacing.base,
     width: '100%',
     alignItems: 'center',
@@ -546,20 +438,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
     color: Colors.white,
     fontWeight: Typography.bold,
-  },
-  footerNote: {
-    backgroundColor: Colors.primaryUltraLight,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-  },
-  footerNoteText: {
-    fontSize: Typography.xs,
-    color: Colors.primary,
-    textAlign: 'center',
-    lineHeight: Typography.xs * 1.6,
-    fontWeight: Typography.medium,
   },
 });

@@ -29,14 +29,17 @@ let model: TfliteModel | null = null;
 
 export async function validateSkin(
   source: ImageSource,
+  mode: 'capture' | 'roi' = 'roi',
 ): Promise<'appearance' | 'model'> {
   const config = SKIN_DETECTOR_CONFIG;
   if (!config) {
     if (!REQUIRE_SKIN_VALIDATION) {
       const rgb = await loadResizedImageRgb(source, 128);
-      if (!inspectSkinAppearance(rgb, 128).accepted) {
+      if (!inspectSkinAppearance(rgb, 128, mode).accepted) {
         throw new Error(
-          'Skin was not detected clearly. Capture a close-up of the skin and lesion with even lighting, then try again.',
+          mode === 'capture'
+            ? 'Skin could not be confirmed in the photo. Center the skin area and lesion, reduce background, and use even lighting.'
+            : 'The selected crop does not show enough surrounding skin. Retake with the lesion centered and some clear skin around it.',
         );
       }
       return 'appearance';

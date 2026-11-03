@@ -1,3 +1,9 @@
+import {
+  CLASSIFIER_MODEL_SHA256,
+  CLASSIFIER_INPUT_SIZE,
+  CLASSIFIER_CONFIDENCE_THRESHOLD,
+  CLASSIFIER_LABELS,
+} from '../config/classifier';
 /**
  * TFLite Classification Service
  *
@@ -5,30 +11,27 @@
  * The predicted class and confidence come only from the trained model output.
  */
 
-import { loadTensorflowModel, type TfliteModel } from 'react-native-fast-tflite';
-import { loadResizedImageRgb, type ImageSource } from './imageProcessingService';
+import {
+  loadTensorflowModel,
+  type TfliteModel,
+} from 'react-native-fast-tflite';
+import {
+  loadResizedImageRgb,
+  type ImageSource,
+} from './imageProcessingService';
 import { getPreprocessedResult } from './preprocessingService';
 import {
   ClassificationResult,
-  LesionClass,
   SelectedSymptoms,
   ThresholdStatus,
 } from '../types';
 import { getAssessmentMessage, getScreeningStatus } from '../utils';
 
-const CONFIDENCE_THRESHOLD = 70;
-const MODEL_INPUT_SIZE = 224;
+const MODEL_SHA256 = CLASSIFIER_MODEL_SHA256;
+const CONFIDENCE_THRESHOLD = CLASSIFIER_CONFIDENCE_THRESHOLD;
+const MODEL_INPUT_SIZE = CLASSIFIER_INPUT_SIZE;
 const MODEL_INPUT_ELEMENTS = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE * 3;
-
-const LABEL_MAP: LesionClass[] = [
-  'Actinic Keratoses',
-  'Basal Cell Carcinoma',
-  'Benign Keratosis',
-  'Dermatofibroma',
-  'Melanoma',
-  'Melanocytic Nevi',
-  'Vascular Lesions',
-];
+const LABEL_MAP = CLASSIFIER_LABELS;
 
 import RNFS from 'react-native-fs';
 import { Platform } from 'react-native';
@@ -41,24 +44,34 @@ async function getModel(): Promise<TfliteModel> {
   try {
     if (Platform.OS === 'android') {
       const modelFilename = 'efficientnet_ham10000.tflite';
-      // Version the cache so existing Android installs load the updated model.
-      const targetPath = `${RNFS.CachesDirectoryPath}/efficientnet_ham10000-20383b0.tflite`;
-      const exists = await RNFS.exists(targetPath);
-      if (!exists) {
-        try {
-          await RNFS.copyFileAssets(modelFilename, targetPath);
-        } catch {
-          // If copyFileAssets fails, attempt from DocumentDirectoryPath or require fallback
-        }
-      }
-      const targetExists = await RNFS.exists(targetPath);
+      // Bind cached bytes to this exact export, not just a reused filename.
+      const targetPath = `${
+        RNFS.CachesDirectoryPath
+      }/efficientnet_ham10000-${MODEL_SHA256.slice(0, 12)}.tflite`;
+      const existingMatches =
+        (await RNFS.exists(targetPath)) &&
+        (await RNFS.hash(targetPath, 'sha256')) === MODEL_SHA256;
+      if (!existingMatches)
+        await RNFS.copyFileAssets(modelFilename, targetPath);
+      const targetExists =
+        (await RNFS.hash(targetPath, 'sha256')) === MODEL_SHA256;
+      if (!targetExists)
+        throw new Error(
+          'The packaged classifier does not match the expected export.',
+        );
       if (targetExists) {
-        cachedModel = await loadTensorflowModel({ url: `file://${targetPath}` }, []);
+        cachedModel = await loadTensorflowModel(
+          { url: `file://${targetPath}` },
+          [],
+        );
         return cachedModel;
       }
     }
   } catch (error) {
-    console.warn('Failed to load Android asset via file path, falling back to require:', error);
+    console.warn(
+      'Failed to load Android asset via file path, falling back to require:',
+      error,
+    );
   }
 
   cachedModel = await loadTensorflowModel(
@@ -86,22 +99,64 @@ export async function runInference(
   preprocessingId?: string,
 ): Promise<ClassificationResult> {
   const model = await getModel();
+  if (
+    model.inputs.length !== 1 ||
+    model.outputs.length !== 1 ||
+    model.inputs[0].dataType !== 'float32' ||
+    model.outputs[0].dataType !== 'float32' ||
+    model.inputs[0].shape.join(',') !==
+      `1,${MODEL_INPUT_SIZE},${MODEL_INPUT_SIZE},3` ||
+    model.outputs[0].shape.join(',') !== `1,${LABEL_MAP.length}`
+  ) {
+    throw new Error(
+      'The classifier format is incompatible. Rebuild the app with the verified EfficientNet model.',
+    );
+  }
   const preprocessedResult = getPreprocessedResult(preprocessingId);
   if (preprocessingId && !preprocessedResult) {
-    throw new Error('The preprocessed image tensor is no longer available. Please preprocess the image again.');
+    throw new Error(
+      'The preprocessed image tensor is no longer available. Please preprocess the image again.',
+    );
   }
-  const inputBuffer = preprocessedResult?.inputTensor ?? await buildInputTensor(source);
+  const inputBuffer =
+    preprocessedResult?.inputTensor ?? (await buildInputTensor(source));
 
-  if (inputBuffer.byteLength !== MODEL_INPUT_ELEMENTS * Float32Array.BYTES_PER_ELEMENT) {
-    throw new Error(`Unexpected input tensor size: ${inputBuffer.byteLength} bytes.`);
+  if (
+    inputBuffer.byteLength !==
+    MODEL_INPUT_ELEMENTS * Float32Array.BYTES_PER_ELEMENT
+  ) {
+    throw new Error(
+      `Unexpected input tensor size: ${inputBuffer.byteLength} bytes.`,
+    );
   }
 
-  const [outputBuffer] = await model.run([inputBuffer]);
-  const probabilities = new Float32Array(outputBuffer);
+  const inputValues = new Float32Array(inputBuffer);
+  if (
+    inputValues.some(
+      value => !Number.isFinite(value) || value < 0 || value > 255,
+    )
+  ) {
+    throw new Error(
+      'The image tensor is invalid. Please prepare the image again.',
+    );
+  }
+  const outputs = await model.run([inputBuffer]);
+  if (
+    outputs.length !== 1 ||
+    outputs[0].byteLength !== LABEL_MAP.length * Float32Array.BYTES_PER_ELEMENT
+  ) {
+    throw new Error(
+      'The classifier returned an incompatible result. Please try again.',
+    );
+  }
+  const probabilities = new Float32Array(outputs[0]);
 
   if (
     probabilities.length !== LABEL_MAP.length ||
-    probabilities.some(score => !Number.isFinite(score))
+    probabilities.some(
+      score => !Number.isFinite(score) || score < 0 || score > 1,
+    ) ||
+    Math.abs(probabilities.reduce((sum, score) => sum + score, 0) - 1) > 0.02
   ) {
     throw new Error(`Unexpected model output size: ${probabilities.length}.`);
   }

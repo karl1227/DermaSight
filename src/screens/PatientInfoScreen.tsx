@@ -13,27 +13,20 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, PatientInfo } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { ProgressSteps } from '../components/ProgressSteps';
+import {
+  PRIMARY_LOCATIONS,
+  OTHER_LOCATIONS,
+  OCCUPATIONS,
+  screeningLabel,
+} from '../utils/screeningInformation';
 import { secureId } from '../utils/secureId';
+import { AGE_ERROR, isValidAge } from '../utils/ageValidation';
 import { useAuth } from '../auth/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PatientInfo'>;
 };
-
-const LESION_LOCATIONS = [
-  'Arm',
-  'Torso',
-  'Shoulder',
-  'Back',
-  'Chest',
-  'Hand',
-  'Face',
-  'Neck',
-  'Leg',
-  'Foot',
-  'Other',
-];
 
 const SEX_OPTIONS: Array<PatientInfo['sex']> = ['Male', 'Female', 'Other'];
 
@@ -47,6 +40,9 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
   const [fullName, setFullName] = useState(user?.name ?? '');
   const [moreLocations, setMoreLocations] = useState(false);
   const [sexExpanded, setSexExpanded] = useState(false);
+  const [occupation, setOccupation] = useState('');
+  const [otherOccupation, setOtherOccupation] = useState('');
+  const [sunburnHistory, setSunburnHistory] = useState<boolean | null>(null);
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<PatientInfo['sex']>(user?.sex ?? '');
   const [lesionLocation, setLesionLocation] = useState('');
@@ -54,14 +50,13 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
   const missing = [
     !owner || !patientId ? 'Enter guest mode or sign in' : '',
     !(user?.name ?? fullName).trim() ? 'Full name is required' : '',
-    !age ||
-    !Number.isInteger(Number(age)) ||
-    Number(age) < 1 ||
-    Number(age) > 120
-      ? 'Enter an age from 1 to 120'
-      : '',
+    !isValidAge(age) ? AGE_ERROR : '',
     !(user?.sex ?? sex) ? 'Select sex' : '',
     !lesionLocation ? 'Select a lesion location' : '',
+    !occupation || (occupation === 'Other' && !otherOccupation.trim())
+      ? 'Enter your occupation'
+      : '',
+    sunburnHistory === null ? 'Select sunburn history' : '',
   ].filter(Boolean);
   const handleContinue = () => {
     if (!owner || !patientId) {
@@ -76,8 +71,8 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
     const ageNum = Number(age);
-    if (!age || !Number.isInteger(ageNum) || ageNum < 1 || ageNum > 120) {
-      Alert.alert('Required', 'Please enter a valid age (1-120).');
+    if (!isValidAge(age)) {
+      Alert.alert('Invalid age', AGE_ERROR);
       return;
     }
     if (!sex) {
@@ -86,6 +81,17 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
     }
     if (!lesionLocation) {
       Alert.alert('Required', 'Please select the lesion location.');
+      return;
+    }
+    if (!occupation || (occupation === 'Other' && !otherOccupation.trim())) {
+      Alert.alert('Required', 'Please select or specify your occupation.');
+      return;
+    }
+    if (sunburnHistory === null) {
+      Alert.alert(
+        'Required',
+        'Please select Yes or No for history of sunburn.',
+      );
       return;
     }
     navigation.navigate('SymptomChecklist', {
@@ -98,6 +104,9 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
         age: ageNum,
         sex: user?.sex ?? sex,
         lesionLocation,
+        occupation:
+          occupation === 'Other' ? otherOccupation.trim() : occupation,
+        sunburnHistory,
       },
     });
   };
@@ -142,9 +151,7 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.fieldLabel}>Screening ID</Text>
             </View>
             <View style={styles.idField}>
-              <Text style={styles.idText}>
-                SCR-{patientId.slice(0, 8).toUpperCase()}
-              </Text>
+              <Text style={styles.idText}>{screeningLabel(patientId)}</Text>
             </View>
           </View>
 
@@ -159,9 +166,14 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
               placeholder="e.g. 25"
               placeholderTextColor={Colors.textMuted}
               keyboardType="number-pad"
-              maxLength={3}
+              accessibilityLabel="Age"
               returnKeyType="done"
             />
+            {age !== '' && !isValidAge(age) && (
+              <Text accessibilityRole="alert" style={styles.ageError}>
+                {AGE_ERROR}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -229,8 +241,8 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <View style={styles.chipRow}>
             {(moreLocations
-              ? LESION_LOCATIONS
-              : LESION_LOCATIONS.slice(0, 6)
+              ? [...PRIMARY_LOCATIONS, ...OTHER_LOCATIONS]
+              : PRIMARY_LOCATIONS
             ).map(loc => (
               <TouchableOpacity
                 key={loc}
@@ -257,17 +269,76 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
             style={{ paddingTop: 12 }}
           >
             <Text style={{ color: Colors.primary }}>
-              {moreLocations ? 'Fewer locations' : 'Other locations'}
+              {moreLocations ? 'Fewer locations' : 'Other Locations'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.noteCard}>
-          <Text style={styles.noteText}>
-            This information is saved with this screening for context. The AI
-            prediction is based on the lesion image and is not a medical
-            diagnosis.
-          </Text>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Occupation</Text>
+          <View style={styles.chipRow}>
+            {OCCUPATIONS.map(option => (
+              <TouchableOpacity
+                key={option}
+                accessibilityRole="button"
+                accessibilityState={{ selected: occupation === option }}
+                style={[
+                  styles.locationChip,
+                  occupation === option && styles.locationChipSelected,
+                ]}
+                onPress={() => setOccupation(option)}
+              >
+                <Text
+                  style={[
+                    styles.locationChipText,
+                    occupation === option && styles.locationChipTextSelected,
+                  ]}
+                >
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {occupation === 'Other' && (
+            <TextInput
+              style={styles.input}
+              accessibilityLabel="Specific occupation"
+              value={otherOccupation}
+              onChangeText={setOtherOccupation}
+              placeholder="Specify your occupation"
+              placeholderTextColor={Colors.textMuted}
+              maxLength={120}
+            />
+          )}
+        </View>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>History of Sunburn</Text>
+          <View style={styles.chipRow}>
+            {[true, false].map(value => (
+              <TouchableOpacity
+                key={String(value)}
+                accessibilityRole="button"
+                accessibilityLabel={`History of Sunburn: ${
+                  value ? 'Yes' : 'No'
+                }`}
+                accessibilityState={{ selected: sunburnHistory === value }}
+                style={[
+                  styles.locationChip,
+                  sunburnHistory === value && styles.locationChipSelected,
+                ]}
+                onPress={() => setSunburnHistory(value)}
+              >
+                <Text
+                  style={[
+                    styles.locationChipText,
+                    sunburnHistory === value && styles.locationChipTextSelected,
+                  ]}
+                >
+                  {value ? 'Yes' : 'No'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
 
@@ -296,6 +367,11 @@ export const PatientInfoScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  ageError: {
+    color: Colors.danger,
+    fontSize: Typography.sm,
+    marginTop: Spacing.xs,
+  },
   container: { flex: 1, backgroundColor: Colors.background },
   topBar: {
     paddingTop: Spacing.md,
@@ -433,19 +509,6 @@ const styles = StyleSheet.create({
   locationChipTextSelected: {
     color: Colors.primary,
     fontWeight: Typography.semiBold,
-  },
-  noteCard: {
-    backgroundColor: Colors.primaryUltraLight,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-    marginTop: Spacing.sm,
-  },
-  noteText: {
-    fontSize: Typography.sm,
-    color: Colors.textSecondary,
-    lineHeight: Typography.sm * 1.6,
   },
   bottomBar: {
     paddingHorizontal: Spacing.xl,

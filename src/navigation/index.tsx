@@ -11,7 +11,8 @@
  *     ├── MainTabs (Bottom Tab Navigator)
  *     │     ├── Home
  *     │     ├── History
- *     │     └── Guide
+ *     │     ├── Analytics
+ *     │     └── Profile
  *     ├── Settings
  *     ├── PatientInfo
  *     ├── SymptomChecklist
@@ -76,6 +77,7 @@ function MainTabs() {
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
+      backBehavior="history"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: AccountColors.teal,

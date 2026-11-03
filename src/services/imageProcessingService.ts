@@ -51,6 +51,26 @@ export interface QualityAssessment {
 
 const DEFAULT_IMAGE_SIZE = 224;
 
+/** Inspect a local file's encoding without decoding/re-encoding its pixels. */
+export async function isOriginalJpegSource(
+  source: ImageSource,
+): Promise<boolean> {
+  const path = source.filePath?.replace(/^file:\/\//, '');
+  // Scoped content/library URIs and base64-only sources need the native converter.
+  if (!path?.startsWith('/')) return false;
+  try {
+    const header = Buffer.from(await RNFS.read(path, 3, 0, 'base64'), 'base64');
+    return (
+      header.length === 3 &&
+      header[0] === 0xff &&
+      header[1] === 0xd8 &&
+      header[2] === 0xff
+    );
+  } catch {
+    return false;
+  }
+}
+
 function stripDataPrefix(base64: string): string {
   return base64.includes(',') ? base64.split(',').pop() ?? base64 : base64;
 }

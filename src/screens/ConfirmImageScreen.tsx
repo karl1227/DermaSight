@@ -1,3 +1,6 @@
+import { LesionRegionPreview } from '../components/LesionRegionPreview';
+import { takePreparedCapture } from '../services/preparedCaptureCache';
+import { screeningLabel } from '../utils/screeningInformation';
 import React from 'react';
 import {
   View,
@@ -39,20 +42,42 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
     imageType,
     imageMeta,
     imageEntry,
+    captureId,
   } = route.params;
   const [prepared, setPrepared] = React.useState<PreparedCapture | null>(null);
   const [stage, setStage] = React.useState('Preparing image');
   const [error, setError] = React.useState<string | null>(null);
   const [attempt, setAttempt] = React.useState(0);
   const [isPreparing, setIsPreparing] = React.useState(true);
-  const [zoom, setZoom] = React.useState(1);
+  const [preparedOnCamera, setPreparedOnCamera] = React.useState(false);
+  const request = React.useRef(0);
+  const acceptedRequest = React.useRef(0);
   const [viewMode, setViewMode] = React.useState<'crop' | 'highlight'>('crop');
 
   React.useEffect(() => {
     let active = true;
+    const requestId = ++request.current;
+    acceptedRequest.current = 0;
+    const isActive = () => active && request.current === requestId;
+    setViewMode('crop');
     setIsPreparing(true);
     setPrepared(null);
     setError(null);
+    setPreparedOnCamera(false);
+    const existing = takePreparedCapture(
+      captureId,
+      patientInfo.owner,
+      imagePath ?? imageUri,
+    );
+    if (existing) {
+      acceptedRequest.current = requestId;
+      setPrepared(existing);
+      setPreparedOnCamera(true);
+      setIsPreparing(false);
+      return () => {
+        active = false;
+      };
+    }
     const interaction = InteractionManager.runAfterInteractions(() => {
       prepareCapture(
         {
@@ -62,16 +87,18 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         },
         imageMeta,
         value => {
-          if (active) setStage(value);
+          if (isActive()) setStage(value);
         },
-        () => !active,
-        zoom,
+        () => !isActive(),
       )
         .then(value => {
-          if (active) setPrepared(value);
+          if (isActive()) {
+            acceptedRequest.current = requestId;
+            setPrepared(value);
+          }
         })
         .catch(reason => {
-          if (active)
+          if (isActive())
             setError(
               reason instanceof Error
                 ? reason.message
@@ -79,33 +106,42 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
             );
         })
         .finally(() => {
-          if (active) setIsPreparing(false);
+          if (isActive()) setIsPreparing(false);
         });
     });
     return () => {
       active = false;
       interaction.cancel();
     };
-  }, [imageData, imageMeta, imagePath, imageType, imageUri, attempt, zoom]);
+  }, [
+    imageData,
+    imageMeta,
+    imagePath,
+    imageType,
+    imageUri,
+    attempt,
+    captureId,
+    patientInfo.owner,
+  ]);
+
+  const retake = () => {
+    request.current++;
+    acceptedRequest.current = 0;
+    setPrepared(null);
+    setIsPreparing(true);
+    navigation.goBack();
+  };
 
   const original = prepared?.originalImage;
   const bounds = prepared?.lesionBounds;
   const showOriginal = viewMode === 'highlight' && Boolean(original);
-  const fit = original
-    ? Math.min(IMAGE_SIZE / original.width, IMAGE_SIZE / original.height)
-    : 1;
-  const originalWidth = (original?.width ?? IMAGE_SIZE) * fit;
-  const originalHeight = (original?.height ?? IMAGE_SIZE) * fit;
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backBtn} onPress={retake}>
           <Text style={styles.backText}>
             {imageEntry === 'gallery' ? '‹ Back' : '‹ Retake'}
           </Text>
@@ -131,7 +167,9 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Screening ID</Text>
-            <Text style={styles.infoValue}>{patientInfo.patientId}</Text>
+            <Text style={styles.infoValue}>
+              {screeningLabel(patientInfo.patientId)}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Location</Text>
@@ -141,31 +179,22 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Image preview; quality and automatic cropping still run locally. */}
         <View style={styles.imageWrapper}>
-          <Image
-            source={{
-              uri: showOriginal
-                ? original!.uri
-                : prepared?.image.uri ?? imageUri,
-            }}
-            style={styles.image}
-            resizeMode="contain"
-          />
-          {showOriginal && bounds && (
-            <View
-              pointerEvents="none"
-              style={[
-                styles.lesionHighlight,
-                {
-                  left:
-                    (IMAGE_SIZE - originalWidth) / 2 +
-                    bounds.left * originalWidth,
-                  top:
-                    (IMAGE_SIZE - originalHeight) / 2 +
-                    bounds.top * originalHeight,
-                  width: (bounds.right - bounds.left) * originalWidth,
-                  height: (bounds.bottom - bounds.top) * originalHeight,
-                },
-              ]}
+          {prepared && original ? (
+            <LesionRegionPreview
+              key={prepared.preprocessing.id}
+              original={original}
+              selected={prepared.image}
+              bounds={bounds}
+              cropped={prepared.cropped}
+              size={IMAGE_SIZE}
+              mode={viewMode}
+              animate={!preparedOnCamera && !captureId}
+            />
+          ) : (
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.image}
+              resizeMode="contain"
             />
           )}
           {isPreparing && (
@@ -209,37 +238,17 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
         ) : null}
 
         {/* Action buttons */}
-        {prepared &&
-          prepared.validationMethod === 'appearance' &&
-          !isPreparing && (
-            <Text style={styles.unavailableText} accessibilityRole="alert">
-              Confirm that the preview shows skin and the intended lesion before
-              analyzing it.
-            </Text>
-          )}
-        {prepared && !isPreparing && (
-          <View style={styles.zoomControls}>
-            <AppButton
-              label="Zoom Out"
-              variant="outline"
-              fullWidth={false}
-              disabled={zoom <= 1}
-              onPress={() => setZoom(value => Math.max(1, value - 0.25))}
-            />
-            <AppButton
-              label="Zoom In"
-              variant="outline"
-              fullWidth={false}
-              disabled={zoom + 0.25 > prepared.maxZoom}
-              onPress={() => setZoom(value => value + 0.25)}
-            />
-          </View>
-        )}
         <AppButton
           label="Analyze Image"
           onPress={() => {
-            if (!prepared || isPreparing || error) return;
-            navigation.replace('AIClassification', {
+            if (
+              !prepared ||
+              isPreparing ||
+              error ||
+              acceptedRequest.current !== request.current
+            )
+              return;
+            navigation.push('AIClassification', {
               patientInfo,
               symptoms,
               imageUri: prepared.image.uri,
@@ -268,7 +277,7 @@ export const ConfirmImageScreen: React.FC<Props> = ({ navigation, route }) => {
               ? 'Back to Camera / Gallery'
               : 'Retake Image'
           }
-          onPress={() => navigation.goBack()}
+          onPress={retake}
           variant="outline"
           size="lg"
         />
@@ -374,20 +383,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   proceedBtn: { marginBottom: Spacing.md },
-  lesionHighlight: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: Colors.accent,
-    backgroundColor: 'rgba(0, 201, 177, 0.15)',
-    borderRadius: Radius.sm,
-  },
   previewModes: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  zoomControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.sm,

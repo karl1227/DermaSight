@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      name="description"
+      content="Educational screening with clear limitations"
+    />
+    <title>Medical Disclaimer | DermaSight</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header>
+      <a class="brand" href="index.html">DermaSight</a>
+      <nav aria-label="Information pages">
+        <a href="index.html">About</a
+        ><a href="privacy.html">Privacy & Data Consent</a
+        ><a href="medical-disclaimer.html" aria-current="page"
+          >Medical Disclaimer</a
+        >
+      </nav>
+    </header>
+    <main id="main">
+      <div class="eyebrow">EDUCATIONAL USE ONLY</div>
+      <h1>Medical Disclaimer</h1>
+      <p class="intro">Educational screening with clear limitations</p>
+      <p class="version">Development version · Updated October 30, 2026</p>
+      <aside>
+        Describes the current prototype. Public contact and hosting details are
+        pending finalization by the project team.
+      </aside>
+      <section>
+        <h2>Purpose</h2>
+        <p>
+          DermaSight is an educational prototype for preliminary skin-lesion
+          awareness. It is not a diagnosis, medical consultation, treatment
+          recommendation or replacement for examination by a qualified
+          healthcare professional. Do not use it to rule out cancer or conclude
+          that a lesion is safe.
+        </p>
+      </section>
+      <section>
+        <h2>Supported classes</h2>
+        <p>
+          The HAM10000-trained EfficientNet TensorFlow Lite classifier predicts
+          among Melanoma, Basal Cell Carcinoma, Actinic Keratoses, Melanocytic
+          Nevi, Benign Keratosis, Dermatofibroma and Vascular Lesions. It does
+          not recognize every condition or establish a clinical diagnosis.
+        </p>
+      </section>
+      <section>
+        <h2>Confidence and risk labels</h2>
+        <p>
+          Confidence is a model score among supported classes, not your
+          probability of cancer or a guarantee. High Risk, Medium Risk and Low
+          Risk are educational display categories, not validated clinical risk
+          estimates. No result can establish or exclude disease. Reported model
+          accuracy does not establish accuracy for a particular person, phone,
+          photograph, or the complete app workflow.
+        </p>
+      </section>
+      <section>
+        <h2>Image validation limitations</h2>
+        <p>
+          The current skin filter uses color and coverage rules. Wood, leather,
+          clothing and skin-colored objects can pass, while genuine skin can be
+          rejected. The classifier can produce confident lesion predictions for
+          unrelated objects. Quality checks and automatic lesion crops can fail
+          or omit context. These checks do not establish clinical suitability.
+        </p>
+      </section>
+      <section>
+        <h2>Seeking care</h2>
+        <p>
+          Have a qualified healthcare professional assess new, growing,
+          bleeding, changing, persistently itchy or otherwise concerning spots
+          regardless of the result. Do not delay care, start/stop treatment or
+          rely on this app to monitor a suspected cancer. Diagnosis may require
+          examination and tests such as biopsy. For a medical emergency, seek
+          local emergency care.
+        </p>
+      </section>
+      <section>
+        <h2>Variation and unsupported uses</h2>
+        <p>
+          Lighting, focus, compression, skin tone, camera hardware, lesion size,
+          framing and differences from training data can affect results. The app
+          provides no live clinician monitoring or emergency service.
+          Occupation, sun exposure and symptom entries do not by themselves
+          establish a diagnosis.
+        </p>
+      </section>
+      <section>
+        <h2>Processing and saved records</h2>
+        <p>
+          Image inference runs on the phone and saved screening records remain
+          local. There is no automatic cloud backup or cross-device history
+          synchronization. Google Sign-In is an account sign-in method and does
+          not store screening images. See Privacy &amp; Data Consent for the
+          account-server and local-storage details.
+        </p>
+      </section>
+      <section>
+        <h2>Acknowledgment</h2>
+        <p>
+          Using the educational screening workflow means acknowledging these
+          limitations. This does not waive privacy rights or claim regulatory
+          approval, clinical validation or fitness for a medical purpose. The
+          project team must obtain appropriate professional and institutional
+          review before clinical deployment.
+        </p>
+      </section>
+      <section>
+        <h2>Further information</h2>
+        <p>
+          <a href="https://www.aad.org/public/diseases/skin-cancer"
+            >American Academy of Dermatology: skin cancer information</a
+          >
+        </p>
+      </section>
+    </main>
+    <footer>
+      DermaSight · Educational screening only. Use your browser’s Back control
+      or switch back to the app to return.
+    </footer>
+  </body>
+</html>

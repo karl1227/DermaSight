@@ -1,3 +1,4 @@
+import { screeningLabel } from '../utils/screeningInformation';
 import { startNewScreening } from '../navigation/screeningFlow';
 import React, { useCallback, useState } from 'react';
 import {
@@ -130,7 +131,9 @@ export const HistoryScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.cardMeta}>
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>Screening ID</Text>
-            <Text style={styles.metaValue}>{item.patient_id}</Text>
+            <Text style={styles.metaValue}>
+              {screeningLabel(item.patient_id)}
+            </Text>
           </View>
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>Confidence</Text>

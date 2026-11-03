@@ -1,24 +1,24 @@
 import ImageResizer from 'react-native-image-resizer';
+import { CAPTURE_INPUT_VERSION } from '../config/capture';
 import {
   assessImageQuality,
-  cropImageToJpeg,
+  isOriginalJpegSource,
   type ImageSource,
   type ImageMetadata,
   type CroppedImage,
   type NormalizedCrop,
 } from './imageProcessingService';
 import { validateSkin } from './skinValidationService';
-import { createAutomaticAreaOfInterest } from './segmentationService';
 import {
   runPreprocessing,
   type PreprocessingResult,
 } from './preprocessingService';
 
 export interface PreparedCapture {
+  inputVersion: typeof CAPTURE_INPUT_VERSION;
   image: CroppedImage;
   preprocessing: PreprocessingResult;
   cropped: boolean;
-  maxZoom: number;
   validationMethod: 'appearance' | 'model';
   originalImage: CroppedImage;
   lesionBounds?: NormalizedCrop;
@@ -53,7 +53,6 @@ export async function prepareCapture(
   metadata: ImageMetadata | undefined,
   onStage: (stage: string) => void,
   isCancelled: () => boolean = () => false,
-  zoom = 1,
 ): Promise<PreparedCapture> {
   const checkActive = () => {
     if (isCancelled()) throw new Error('Capture cancelled.');
@@ -95,9 +94,6 @@ export async function prepareCapture(
   };
   const normalizedSource = { filePath: image.path, mimeType: 'image/jpeg' };
   checkActive();
-  onStage('Checking for skin');
-  let validationMethod = await validateSkin(normalizedSource);
-  checkActive();
   onStage('Checking image quality');
   const quality = await assessImageQuality(normalizedSource, {
     width: Math.min(metadata?.width ?? image.width, image.width),
@@ -106,64 +102,41 @@ export async function prepareCapture(
   });
   assertUsableQuality(quality.metrics);
   checkActive();
-  onStage('Finding the lesion');
-  let selected = image;
-  let cropped = false;
-  let lesionBounds: NormalizedCrop | undefined;
-  try {
-    const aoi = await createAutomaticAreaOfInterest(normalizedSource);
-    lesionBounds = aoi.segmentation?.bounds;
-    // Avoid unusable tiny crops; keep surrounding skin and the original fallback.
-    if (aoi.image && aoi.image.width >= 224 && aoi.image.height >= 224) {
-      selected = aoi.image;
-      cropped = true;
-    }
-  } catch {
-    // Skin/quality already passed; segmentation failure uses the validated image.
-  }
+  // Presentation baseline: use the full photo for both camera and
+  // gallery. U-Net segmentation and automatic ROI cropping are disabled.
+  onStage('Checking for skin');
+  const validationMethod = await validateSkin(normalizedSource, 'capture');
   checkActive();
-  const maxZoom = Math.min(3, Math.min(selected.width, selected.height) / 224);
-  if (zoom > 1) {
-    if (zoom > maxZoom)
-      throw new Error(
-        'This crop is too small. Zoom out or capture a closer image.',
-      );
-    const margin = (1 - 1 / zoom) / 2;
-    selected = await cropImageToJpeg(
-      { filePath: selected.path },
-      {
-        left: margin,
-        top: margin,
-        right: 1 - margin,
-        bottom: 1 - margin,
-      },
-    );
-    cropped = true;
-    checkActive();
-  }
-  if (cropped) {
-    validationMethod = await validateSkin({ filePath: selected.path });
-    checkActive();
-    const roiQuality = await assessImageQuality(
-      { filePath: selected.path },
-      selected,
-    );
-    assertUsableQuality(roiQuality.metrics);
-    checkActive();
-  }
+  // Restore the pre-segmentation JPEG path: classification reads the exact
+  // original file once, avoiding the added 1024px resize and JPEG recompression.
+  // Keep native conversion for formats/URIs the JPEG decoder cannot read.
+  const useOriginal = await isOriginalJpegSource(source);
+  checkActive();
+  const analysisImage: CroppedImage =
+    useOriginal && source.filePath
+      ? {
+          uri: source.filePath.startsWith('file://')
+            ? source.filePath
+            : `file://${source.filePath}`,
+          path: source.filePath,
+          width: metadata?.width ?? image.width,
+          height: metadata?.height ?? image.height,
+          fileSize: metadata?.fileSize ?? 0, // Unknown original byte size; do not reuse the converted file size.
+        }
+      : image;
   onStage('Preparing for analysis');
   const preprocessing = await runPreprocessing(
-    { filePath: selected.path, mimeType: 'image/jpeg' },
+    { filePath: analysisImage.path, mimeType: 'image/jpeg' },
     () => {},
   );
   checkActive();
   return {
-    image: selected,
+    inputVersion: CAPTURE_INPUT_VERSION,
+    image: analysisImage,
     preprocessing,
-    cropped,
-    maxZoom,
+    cropped: false,
     validationMethod,
-    originalImage: image,
-    lesionBounds,
+    originalImage: analysisImage,
+    lesionBounds: undefined,
   };
 }
