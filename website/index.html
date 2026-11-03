@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>About DermaSight | DermaSight</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header>
+      <a class="brand" href="index.html">DermaSight</a>
+      <nav aria-label="Information pages">
+        <a href="index.html" aria-current="page">About</a
+        ><a href="privacy.html">Privacy &amp; Data Consent</a
+        ><a href="medical-disclaimer.html">Medical Disclaimer</a>
+      </nav>
+    </header>
+    <main id="main">
+      <div class="eyebrow">EDUCATIONAL USE ONLY</div>
+      <h1>About DermaSight</h1>
+      <p class="intro">
+        Supporting skin awareness through preliminary screening
+      </p>
+      <aside>
+        Current local development version. Guest and registered screening
+        records remain on the phone. Cloud screening storage and Firebase
+        integration are planned, not enabled. Opening this page does not record
+        consent or change your account.
+      </aside>
+      <p>
+        DermaSight is a hybrid mobile application developed for the capstone
+        study DermaSight: A Mobile Application for Pigmented Skin Lesion
+        Classification Utilizing Convolutional Neural Networks.
+      </p>
+      <p>
+        The project was developed by Karl Christopher D. Blockstock, Michelle
+        Ann S. Angeles, Emmanuel M. Espeña and Gerald Elli Ramos of the College
+        of Computer Studies, Technological Institute of the Philippines–Quezon
+        City.
+      </p>
+      <section>
+        <h2>Purpose</h2>
+        <p>
+          DermaSight helps users document a skin concern and obtain a
+          preliminary image-based classification. Its purpose is to support
+          awareness and encourage appropriate professional assessment.
+        </p>
+        <p>
+          It does not confirm a disease, determine severity or cancer stage,
+          prescribe treatment, or replace a licensed healthcare professional.
+        </p>
+      </section>
+      <section>
+        <h2>How the application works</h2>
+        <p>
+          Users provide screening information, select the lesion’s body
+          location, answer the available symptom questions, and capture or
+          select a photograph.
+        </p>
+        <p>
+          The information collected includes name, age, sex, lesion location,
+          occupation and history of sunburn. These entries provide a record of
+          the screening context. Collecting them does not, by itself, establish
+          that they are inputs to the image-classification model.
+        </p>
+        <p>
+          The application prepares the photograph and uses its classification
+          model to suggest a possible lesion category. The model was trained
+          using HAM10000, a research dataset containing dermoscopic images
+          organized into seven categories:
+        </p>
+        <ul>
+          <li>Melanoma</li>
+          <li>Basal cell carcinoma</li>
+          <li>
+            Actinic keratoses and intraepithelial carcinoma, including Bowen’s
+            disease
+          </li>
+          <li>Melanocytic nevi</li>
+          <li>Benign keratosis-like lesions</li>
+          <li>Dermatofibroma</li>
+          <li>Vascular lesions</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Offline and online operation</h2>
+        <p>
+          Guests use a unique local guest session without creating an account.
+          Screening records and images remain on the device. Registered users
+          can also access locally saved records through a valid restored
+          session.
+        </p>
+        <p>
+          An internet connection allows users to register or sign in through the
+          account server. Screening records and images still remain on the
+          phone; signing in does not upload them. The email identifies the
+          account, and reports are not automatically emailed. Cloud storage and
+          cross-device screening synchronization are planned, not implemented.
+        </p>
+      </section>
+      <section>
+        <h2>Body locations and model limitations</h2>
+        <p>
+          DermaSight provides multiple body-location options rather than
+          limiting screening to the torso and arms. Selecting a location
+          organizes the screening information; it does not establish equal model
+          performance at every body site.
+        </p>
+        <p>
+          The model’s training data consists of dermoscopic research images.
+          Performance on ordinary smartphone photographs and across skin tones
+          requires representative evaluation. Research has documented
+          differences in dermatology AI performance across skin-tone groups.
+        </p>
+      </section>
+      <section>
+        <h2>Understanding the result</h2>
+        <p>
+          A possible classification is a suggested match among the model’s
+          supported categories. A confidence score is a model-generated score,
+          not a confirmed diagnosis or a clinically validated probability that
+          the user has cancer.
+        </p>
+        <p>
+          A reassuring result should not prevent consultation when a skin change
+          is concerning.
+        </p>
+      </section>
+      <section id="references">
+        <h2>References</h2>
+        <ol>
+          <li>
+            <a href="https://doi.org/10.1038/sdata.2018.161"
+              >Tschandl, Rosendahl &amp; Kittler (2018). The HAM10000 dataset.
+              Scientific Data, 5, 180161.</a
+            >
+          </li>
+          <li>
+            <a href="https://privacy.gov.ph/data-privacy-act/"
+              >Republic Act No. 10173: Data Privacy Act of 2012.</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://privacy.gov.ph/wp-content/uploads/2023/11/NPC-Circular-No.-2023-04_Guidelines-on-Consent_07Nov2023.pdf"
+              >NPC Circular No. 2023-04: Guidelines on Consent (2023).</a
+            >
+          </li>
+          <li>
+            <a href="https://privacy.gov.ph/data-subject-rights/"
+              >National Privacy Commission: Data subject rights.</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://www.aad.org/public/diseases/skin-cancer/types/common/melanoma/diagnose-treat"
+              >American Academy of Dermatology: Melanoma diagnosis and
+              treatment.</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://www.aad.org/public/diseases/skin-cancer/types/common/melanoma/symptoms"
+              >American Academy of Dermatology: Melanoma signs and symptoms.</a
+            >
+          </li>
+          <li>
+            <a href="https://doi.org/10.1126/sciadv.abq6147"
+              >Daneshjou et al. (2022). Disparities in dermatology AI
+              performance on a diverse, curated clinical image set. Science
+              Advances, 8(32), eabq6147.</a
+            >
+          </li>
+          <li>
+            <a href="https://policies.google.com/privacy"
+              >Google Privacy Policy (current published version).</a
+            >
+          </li>
+        </ol>
+      </section>
+    </main>
+    <footer>
+      DermaSight · Educational screening only. Return to the app using your
+      browser’s Back control or the app switcher. Privacy contact:
+      <a href="mailto:qmasamar@tip.edu.ph">qmasamar@tip.edu.ph</a>.
+    </footer>
+  </body>
+</html>

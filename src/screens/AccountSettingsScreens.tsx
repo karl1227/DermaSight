@@ -1,4 +1,11 @@
+import {
+  ABOUT_SUMMARY,
+  PROJECT_OPERATORS,
+  PROJECT_INSTITUTION,
+} from '../content/information';
 import { googleIdToken } from '../auth/google';
+import { PolicyLink } from '../components/PolicyLink';
+import { backToSettings } from '../navigation/screeningFlow';
 import React, { useState } from 'react';
 import {
   Text,
@@ -22,7 +29,7 @@ import {
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList> };
 function Back({ navigation }: Props) {
   return (
-    <TouchableOpacity style={a.back} onPress={() => navigation.goBack()}>
+    <TouchableOpacity style={a.back} onPress={() => backToSettings(navigation)}>
       <Text style={a.link}>‹ Back</Text>
     </TouchableOpacity>
   );
@@ -216,32 +223,36 @@ export function AboutScreen({ navigation }: Props) {
       <Text style={a.title}>About DermaSight</Text>
       <Text style={a.subtitle}>AI skin lesion screening · v1.0</Text>
       <View style={[a.card, s.card]}>
-        <Text style={a.label}>Purpose</Text>
+        <Text style={s.body}>{ABOUT_SUMMARY}</Text>
         <Text style={s.body}>
-          DermaSight provides preliminary educational screening of skin lesion
-          images using a CNN EfficientNet model trained with HAM10000 and
-          TensorFlow Lite inference on this device.
+          Users can record personal screening information, lesion location,
+          symptoms, occupation and sunburn history.
         </Text>
-        <Text style={a.label}>Intended use</Text>
+        <Text style={a.label}>Offline</Text>
         <Text style={s.body}>
-          Predictions are not medical diagnoses. Consult a qualified healthcare
-          professional about skin changes or concerns. The model can make
-          mistakes.
+          Guest screenings and locally saved account records stay on this
+          device.
         </Text>
-        <Text style={a.label}>Privacy and offline use</Text>
+        <Text style={a.label}>Online</Text>
         <Text style={s.body}>
-          Screening records and images remain on this device in local storage.
-          Signing in sends account information to the account service. Google
-          Sign-In sends a Google ID token for verification. No scan images are
-          uploaded by this implementation. Internet is needed for new account
-          sign-in and profile updates; local screening and saved history remain
-          available to guests and valid restored sessions.
+          Users can register or sign in through the project account server.
+          Screening records still remain on the phone. Cloud storage is planned
+          and not enabled.
         </Text>
         <Text style={s.body}>
-          See Privacy & Data Consent and Medical Disclaimer in Settings for the
-          existing consent information.
+          Results are screening estimates—not medical diagnoses, severity
+          assessments or cancer stages. Consult a licensed dermatologist about
+          concerning skin changes.
+        </Text>
+        <Text style={a.label}>Project Team</Text>
+        <Text style={s.body}>
+          {PROJECT_OPERATORS} of the {PROJECT_INSTITUTION}.
         </Text>
       </View>
+      <PolicyLink kind="about" />
+      <PolicyLink kind="privacy" />
+      <PolicyLink kind="medical-disclaimer" />
+      <PolicyLink kind="about" anchor="references" />
     </AccountScreen>
   );
 }

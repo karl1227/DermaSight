@@ -1,3 +1,6 @@
+import { PRIVACY_SECTIONS } from '../content/information';
+import { backToSettings } from '../navigation/screeningFlow';
+import { PolicyLink } from '../components/PolicyLink';
 import React from 'react';
 import {
   View,
@@ -18,33 +21,7 @@ type Props = {
   >;
 };
 
-interface Section {
-  title: string;
-  icon: 'db' | 'wifi' | 'x';
-  body: string;
-  citation: string;
-}
-
-const SECTIONS: Section[] = [
-  {
-    icon: 'db',
-    title: 'On-Device Storage',
-    body: 'Screening records stay in local SQLite. Images are stored as files on this device. Account profiles are stored by the account service and cached locally.',
-    citation: 'DermaSight data handling',
-  },
-  {
-    icon: 'wifi',
-    title: 'Offline Processing',
-    body: 'TensorFlow Lite executes CNN inferences locally on-device with zero internet reliance.',
-    citation: 'DermaSight data handling',
-  },
-  {
-    icon: 'x',
-    title: 'Account Connections',
-    body: 'Skin images and screening results are not uploaded. Account sign-in sends account details to the account service; Google Sign-In sends an identity token for verification. Internet is needed for account sign-in and profile updates.',
-    citation: 'DermaSight data handling',
-  },
-];
+const SECTIONS = PRIVACY_SECTIONS;
 
 // ─── Icon components ──────────────────────────────────────────────────────────
 
@@ -97,7 +74,7 @@ export const SettingsPrivacyConsentScreen: React.FC<Props> = ({
 
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => backToSettings(navigation)}
           style={styles.backBtn}
         >
           <Text style={styles.backChevron}>‹</Text>
@@ -132,9 +109,11 @@ export const SettingsPrivacyConsentScreen: React.FC<Props> = ({
           );
         })}
 
+        <PolicyLink kind="privacy" />
+
         <TouchableOpacity
           style={styles.doneBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => backToSettings(navigation)}
           activeOpacity={0.85}
         >
           <Text style={styles.doneBtnText}>Done</Text>

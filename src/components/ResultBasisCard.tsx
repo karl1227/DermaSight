@@ -25,7 +25,9 @@ export const ResultBasisCard: React.FC<ResultBasisCardProps> = ({ result }) => {
 
       <View style={styles.row}>
         <Text style={styles.rowLabel}>Confidence Score</Text>
-        <Text style={styles.rowValue}>{formatConfidence(result.confidenceScore)}</Text>
+        <Text style={styles.rowValue}>
+          {formatConfidence(result.confidenceScore)}
+        </Text>
       </View>
 
       <View style={styles.divider} />
@@ -43,27 +45,20 @@ export const ResultBasisCard: React.FC<ResultBasisCardProps> = ({ result }) => {
           style={[
             styles.badge,
             isAboveThreshold ? styles.badgeSuccess : styles.badgeWarning,
-          ]}>
+          ]}
+        >
           <Text
             style={[
               styles.badgeText,
-              isAboveThreshold ? styles.badgeTextSuccess : styles.badgeTextWarning,
-            ]}>
+              isAboveThreshold
+                ? styles.badgeTextSuccess
+                : styles.badgeTextWarning,
+            ]}
+          >
             {result.thresholdStatus}
           </Text>
         </View>
       </View>
-
-      <View style={styles.divider} />
-
-      <Text style={styles.basisLabel}>Matching Visual Features</Text>
-      {result.matchingVisualFeatures.map((feature, idx) => (
-        <View key={idx} style={styles.featureRow}>
-          <View style={styles.featureDot} />
-          <Text style={styles.featureText}>{feature}</Text>
-        </View>
-      ))}
-
     </AppCard>
   );
 };

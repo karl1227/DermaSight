@@ -1,4 +1,10 @@
-import React from 'react';
+import {
+  MEDICAL_SECTIONS,
+  MEDICAL_ACKNOWLEDGMENT,
+} from '../content/information';
+import React, { useState } from 'react';
+import { PolicyLink } from '../components/PolicyLink';
+import { ConsentCheckbox } from '../components/ConsentCheckbox';
 import {
   View,
   Text,
@@ -12,40 +18,20 @@ import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'MedicalDisclaimer'>;
+  navigation: NativeStackNavigationProp<
+    RootStackParamList,
+    'MedicalDisclaimer'
+  >;
 };
 
-interface DisclaimerItem {
-  title: string;
-  body: string;
-  citation: string;
-  titleColor: string;
-  danger?: boolean;
-}
-
-const DISCLAIMERS: DisclaimerItem[] = [
-  {
-    title: 'Educational Screening Only',
-    body: 'Serves as a preliminary awareness tool, not a diagnostic system.',
-    citation: 'Vodrahalli et al., 2023',
-    titleColor: Colors.primary,
-  },
-  {
-    title: 'No Professional Replacement',
-    body: 'Results do not replace clinical consultation or treatment plans from licensed dermatologists.',
-    citation: 'Buenaflor, 2026',
-    titleColor: Colors.primary,
-  },
-  {
-    title: 'Seek Immediate Care',
-    body: 'Consult a doctor immediately if lesions bleed, hurt, or change rapidly.',
-    citation: 'Abbasi et al., 2004',
-    titleColor: Colors.danger,
-    danger: true,
-  },
-];
+const DISCLAIMERS = MEDICAL_SECTIONS.map(item => ({
+  ...item,
+  citation: 'Read the full Medical Disclaimer and references',
+  titleColor: item.danger ? Colors.danger : Colors.primary,
+}));
 
 export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
+  const [accepted, setAccepted] = useState(false);
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
@@ -54,7 +40,8 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
-          activeOpacity={0.7}>
+          activeOpacity={0.7}
+        >
           <Text style={styles.backBtnText}>‹ Back</Text>
         </TouchableOpacity>
       </View>
@@ -62,8 +49,8 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Warning icon */}
         <View style={styles.iconWrapper}>
           <View style={styles.iconCircle}>
@@ -73,29 +60,45 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.pageTitle}>Medical Safety Disclaimer</Text>
+        <Text style={styles.pageTitle}>Medical Disclaimer</Text>
 
         {DISCLAIMERS.map((item, idx) => (
           <View
             key={idx}
-            style={[styles.card, item.danger && styles.cardDanger]}>
+            style={[styles.card, item.danger && styles.cardDanger]}
+          >
             <Text style={[styles.cardTitle, { color: item.titleColor }]}>
               {item.title}
             </Text>
             <View style={styles.bulletRow}>
-              <View style={[styles.bulletDot, item.danger && styles.bulletDotDanger]} />
+              <View
+                style={[
+                  styles.bulletDot,
+                  item.danger && styles.bulletDotDanger,
+                ]}
+              />
               <Text style={styles.cardBody}>{item.body}</Text>
             </View>
             <Text style={styles.citation}>{item.citation}</Text>
           </View>
         ))}
 
+        <PolicyLink kind="medical-disclaimer" />
+        <ConsentCheckbox
+          checked={accepted}
+          onChange={setAccepted}
+          label={MEDICAL_ACKNOWLEDGMENT}
+        />
         <View style={styles.bottomButtons}>
           <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={() => navigation.navigate('PrivacyConsent')}
-            activeOpacity={0.85}>
-            <Text style={styles.continueBtnText}>I Understand, Continue</Text>
+            style={[styles.continueBtn, !accepted && styles.disabled]}
+            disabled={!accepted}
+            onPress={() => {
+              if (accepted) navigation.navigate('PrivacyConsent');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.continueBtnText}>I Understand</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -104,6 +107,7 @@ export const MedicalDisclaimerScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  disabled: { opacity: 0.45 },
   container: { flex: 1, backgroundColor: Colors.surface },
   headerBar: {
     paddingHorizontal: Spacing.xl,

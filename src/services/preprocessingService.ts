@@ -1,10 +1,14 @@
+import { CLASSIFIER_INPUT_SIZE } from '../config/classifier';
 /**
  * Image Preprocessing Service
  *
  * Prepares a captured image for EfficientNet inference.
  */
 
-import { loadResizedImageRgb, type ImageSource } from './imageProcessingService';
+import {
+  loadResizedImageRgb,
+  type ImageSource,
+} from './imageProcessingService';
 
 export interface PreprocessingStep {
   id: string;
@@ -40,10 +44,7 @@ export const PREPROCESSING_STEPS: PreprocessingStep[] = [
   },
 ];
 
-export type StepProgressCallback = (
-  stepId: string,
-  completed: boolean,
-) => void;
+export type StepProgressCallback = (stepId: string, completed: boolean) => void;
 
 export interface PreprocessingImageSource {
   base64?: string;
@@ -61,9 +62,10 @@ export interface PreprocessingResult {
   inputRange: '0-255';
 }
 
-const MODEL_INPUT_SIZE = 224;
+const MODEL_INPUT_SIZE = CLASSIFIER_INPUT_SIZE;
 const MODEL_INPUT_CHANNELS = 3;
-const MODEL_INPUT_ELEMENTS = MODEL_INPUT_SIZE * MODEL_INPUT_SIZE * MODEL_INPUT_CHANNELS;
+const MODEL_INPUT_ELEMENTS =
+  MODEL_INPUT_SIZE * MODEL_INPUT_SIZE * MODEL_INPUT_CHANNELS;
 
 const preprocessingCache = new Map<string, PreprocessingResult>();
 
@@ -79,7 +81,9 @@ function markStep(
   onStepUpdate(stepId, completed);
 }
 
-export function getPreprocessedResult(id?: string): PreprocessingResult | undefined {
+export function getPreprocessedResult(
+  id?: string,
+): PreprocessingResult | undefined {
   return id ? preprocessingCache.get(id) : undefined;
 }
 
@@ -94,9 +98,7 @@ export async function runPreprocessing(
   onStepUpdate: StepProgressCallback,
 ): Promise<PreprocessingResult> {
   const source: ImageSource =
-    typeof imageSource === 'string'
-      ? { filePath: imageSource }
-      : imageSource;
+    typeof imageSource === 'string' ? { filePath: imageSource } : imageSource;
 
   markStep(onStepUpdate, 'decode', false);
   markStep(onStepUpdate, 'decode', true);

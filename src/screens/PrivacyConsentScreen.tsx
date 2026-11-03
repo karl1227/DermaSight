@@ -1,5 +1,8 @@
+import { PRIVACY_SECTIONS, SCREENING_CONSENT } from '../content/information';
+import { ConsentCheckbox } from '../components/ConsentCheckbox';
 import { returnToDashboard } from '../navigation/screeningFlow';
-import React from 'react';
+import React, { useState } from 'react';
+import { PolicyLink } from '../components/PolicyLink';
 import {
   View,
   Text,
@@ -19,33 +22,7 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PrivacyConsent'>;
 };
 
-interface Section {
-  title: string;
-  icon: 'db' | 'wifi' | 'x';
-  body: string;
-  citation: string;
-}
-
-const SECTIONS: Section[] = [
-  {
-    icon: 'db',
-    title: 'On-Device Storage',
-    body: 'Screening records stay in local SQLite. Images are stored as files on this device. Account profiles are stored by the account service and cached locally.',
-    citation: 'DermaSight data handling',
-  },
-  {
-    icon: 'wifi',
-    title: 'Offline Processing',
-    body: 'TensorFlow Lite executes CNN inferences locally on-device with zero internet reliance.',
-    citation: 'DermaSight data handling',
-  },
-  {
-    icon: 'x',
-    title: 'Account Connections',
-    body: 'Skin images and screening results are not uploaded. Account sign-in sends account details to the account service; Google Sign-In sends an identity token for verification. Internet is needed for account sign-in and profile updates.',
-    citation: 'DermaSight data handling',
-  },
-];
+const SECTIONS = PRIVACY_SECTIONS;
 
 // ─── Small inline icon components ────────────────────────────────────────────
 
@@ -91,13 +68,19 @@ const ICONS = { db: DbIcon, wifi: WifiIcon, x: XIcon };
 
 export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
   const { completeConsent } = useAuth();
+  const [accepted, setAccepted] = useState(false);
+  const [saving, setSaving] = useState(false);
   const handleAgree = async () => {
+    if (!accepted || saving) return;
+    setSaving(true);
     try {
       await markFirstRunCompleted();
       completeConsent();
       returnToDashboard(navigation);
     } catch {
       Alert.alert('Could not save consent', 'Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -162,10 +145,17 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
           );
         })}
 
+        <PolicyLink kind="privacy" />
+        <ConsentCheckbox
+          checked={accepted}
+          onChange={setAccepted}
+          label={SCREENING_CONSENT}
+        />
         {/* Buttons */}
         <View style={styles.buttonGroup}>
           <TouchableOpacity
-            style={styles.agreeBtn}
+            style={[styles.agreeBtn, (!accepted || saving) && styles.disabled]}
+            disabled={!accepted || saving}
             onPress={handleAgree}
             activeOpacity={0.85}
           >
@@ -177,7 +167,7 @@ export const PrivacyConsentScreen: React.FC<Props> = ({ navigation }) => {
             onPress={handleCancel}
             activeOpacity={0.7}
           >
-            <Text style={styles.cancelBtnText}>Cancel</Text>
+            <Text style={styles.cancelBtnText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -252,6 +242,7 @@ const iconS = StyleSheet.create({
 // ─── Screen styles ────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  disabled: { opacity: 0.45 },
   container: { flex: 1, backgroundColor: Colors.background },
   topBar: {
     paddingHorizontal: Spacing.xl,

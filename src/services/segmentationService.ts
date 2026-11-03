@@ -1,3 +1,4 @@
+import { summarizeLesionMask } from './lesionMask';
 /** Runs the bundled lesion-segmentation model entirely on the device. */
 import {
   loadTensorflowModel,
@@ -17,7 +18,6 @@ const MODEL_FILENAME = 'lesion_segmentation.tflite';
 const MODEL_SIZE = 256;
 const MODEL_INPUT_ELEMENTS = MODEL_SIZE * MODEL_SIZE * 3;
 const MASK_PIXELS = MODEL_SIZE * MODEL_SIZE;
-const MASK_THRESHOLD = 0.5;
 
 export interface SegmentationResult {
   /** Percentage of the image classified as lesion by the segmentation mask. */
@@ -35,26 +35,33 @@ export interface AreaOfInterestResult {
 
 let cachedModel: TfliteModel | null = null;
 
-async function getModel(): Promise<TfliteModel> {
-  if (cachedModel) return cachedModel;
-
+/** Load on demand after capture; no model runs against the live preview. */
+async function createSegmentationModel(): Promise<TfliteModel> {
   if (Platform.OS === 'android') {
-    const cachedPath = `${RNFS.CachesDirectoryPath}/${MODEL_FILENAME}`;
-    if (!(await RNFS.exists(cachedPath))) {
+    const cachedPath = RNFS.CachesDirectoryPath + '/' + MODEL_FILENAME;
+    if (!(await RNFS.exists(cachedPath)))
       await RNFS.copyFileAssets(MODEL_FILENAME, cachedPath);
-    }
-    cachedModel = await loadTensorflowModel(
-      { url: `file://${cachedPath}` },
-      [],
-    );
-    return cachedModel;
+    return loadTensorflowModel({ url: 'file://' + cachedPath }, []);
   }
-
-  cachedModel = await loadTensorflowModel(
+  return loadTensorflowModel(
     require('../assets/models/lesion_segmentation.tflite'),
     [],
   );
-  return cachedModel;
+}
+let pendingModel: Promise<TfliteModel> | null = null;
+async function getModel(): Promise<TfliteModel> {
+  if (cachedModel) return cachedModel;
+  if (!pendingModel)
+    pendingModel = createSegmentationModel()
+      .then(value => {
+        cachedModel = value;
+        return value;
+      })
+      .catch(error => {
+        pendingModel = null;
+        throw error;
+      });
+  return pendingModel;
 }
 
 export async function segmentLesion(
@@ -78,49 +85,7 @@ export async function segmentLesion(
     throw new Error(`Unexpected segmentation mask size: ${mask.length}.`);
   }
 
-  let lesionPixels = 0;
-  let total = 0;
-  let left = MODEL_SIZE;
-  let top = MODEL_SIZE;
-  let right = 0;
-  let bottom = 0;
-  for (let index = 0; index < mask.length; index += 1) {
-    const probability = Math.min(1, Math.max(0, mask[index]));
-    total += probability;
-    if (probability >= MASK_THRESHOLD) {
-      lesionPixels += 1;
-      const x = index % MODEL_SIZE;
-      const y = Math.floor(index / MODEL_SIZE);
-      left = Math.min(left, x);
-      top = Math.min(top, y);
-      right = Math.max(right, x);
-      bottom = Math.max(bottom, y);
-    }
-  }
-
-  const coveragePercent = (lesionPixels / MASK_PIXELS) * 100;
-  const lesionDetected = lesionPixels >= 32;
-  let bounds: NormalizedCrop | undefined;
-  if (lesionDetected) {
-    // Preserve surrounding skin: add 20% of the longest lesion dimension,
-    // with a small minimum margin for compact lesions.
-    const margin = Math.max(
-      12,
-      Math.ceil(Math.max(right - left + 1, bottom - top + 1) * 0.2),
-    );
-    bounds = {
-      left: Math.max(0, (left - margin) / MODEL_SIZE),
-      top: Math.max(0, (top - margin) / MODEL_SIZE),
-      right: Math.min(1, (right + 1 + margin) / MODEL_SIZE),
-      bottom: Math.min(1, (bottom + 1 + margin) / MODEL_SIZE),
-    };
-  }
-  return {
-    coveragePercent: Number(coveragePercent.toFixed(1)),
-    meanProbability: Number((total / MASK_PIXELS).toFixed(3)),
-    lesionDetected,
-    bounds,
-  };
+  return summarizeLesionMask(mask);
 }
 
 /** Segments the lesion and materializes its automatically selected AOI. */

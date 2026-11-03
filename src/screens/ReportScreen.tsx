@@ -1,3 +1,8 @@
+import {
+  backToDashboard,
+  returnToDashboard,
+} from '../navigation/screeningFlow';
+import { screeningLabel } from '../utils/screeningInformation';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -19,8 +24,11 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, ScreeningRecord, ScreeningStatus } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
+import { LesionExplanationCard } from '../components/LesionExplanationCard';
+import { SelectedSymptoms } from '../components/SelectedSymptoms';
 import { DisclaimerCard } from '../components/DisclaimerCard';
 import { useAuth } from '../auth/AuthContext';
+import { AGE_ERROR, isValidAge } from '../utils/ageValidation';
 import {
   getScreeningById,
   deleteScreening,
@@ -55,18 +63,30 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setRecord(null);
+    setImageMissing(false);
     if (!owner) {
       setRecord(null);
       setLoading(false);
       return;
     }
     getScreeningById(recordId, owner)
-      .then(r => setRecord(r))
+      .then(r => {
+        if (active) setRecord(r);
+      })
       .catch(() => {
+        if (!active) return;
         setRecord(null);
         Alert.alert('Could not load report', 'Please try again.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [recordId, owner]);
 
   const openEdit = () => {
@@ -79,14 +99,14 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleSave = async () => {
     const trimmedName = editName.trim();
-    const parsedAge = parseInt(editAge, 10);
+    const parsedAge = Number(editAge);
 
     if (!trimmedName) {
       Alert.alert('Validation', 'Full name cannot be empty.');
       return;
     }
-    if (isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120) {
-      Alert.alert('Validation', 'Please enter a valid age (1–120).');
+    if (!isValidAge(editAge)) {
+      Alert.alert('Invalid age', AGE_ERROR);
       return;
     }
     if (!['Male', 'Female', 'Other'].includes(editSex)) {
@@ -123,7 +143,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
             try {
               await deleteScreening(recordId, owner);
               await deleteLocalImage(record.image_path);
-              navigation.goBack();
+              returnToDashboard(navigation, 'History');
             } catch {
               Alert.alert('Could not delete report', 'Please try again.');
             }
@@ -147,7 +167,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
         <Text style={styles.notFoundText}>Record not found.</Text>
         <AppButton
           label="Go Back"
-          onPress={() => navigation.goBack()}
+          onPress={() => backToDashboard(navigation, 'History')}
           size="md"
           style={{ marginTop: Spacing.base, width: 140 }}
         />
@@ -166,37 +186,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
     record.selected_symptoms,
     {},
   );
-  const features = safeJsonParse<string[]>(record.matching_visual_features, []);
   const imageUri = toImageUri(record.image_path);
-
-  const abcdeLabels: Record<string, string> = {
-    asymmetry: 'A - Asymmetry',
-    borderIrregularity: 'B - Border Irregularity',
-    colorVariation: 'C - Color Variation',
-    diameterLarge: 'D - Diameter > 6mm',
-    evolution: 'E - Evolution',
-  };
-
-  const symptomLabels: Record<string, string> = {
-    pearlyOrWaxyBump: 'Pearly or waxy bump',
-    roughOrScalyTexture: 'Rough or scaly texture',
-    bleedingOrCrusting: 'Bleeding or crusting',
-    firmSmallNodule: 'Firm small nodule',
-    dimplingWhenPinched: 'Dimpling when pinched',
-    blanchingWhenPressed: 'Blanching when pressed',
-    redOrPurpleBump: 'Red or purple bump',
-    stableAppearance: 'Stable appearance',
-    painOrTenderness: 'Pain or tenderness',
-    itching: 'Itching',
-  };
-
-  const selectedAbcde = Object.entries(abcde)
-    .filter(([, v]) => v)
-    .map(([k]) => abcdeLabels[k] ?? k);
-
-  const selectedSymptoms = Object.entries(symptoms)
-    .filter(([, v]) => v)
-    .map(([k]) => symptomLabels[k] ?? k);
 
   const InfoRow = ({ label, value }: { label: string; value: string }) => (
     <View style={styles.infoRow}>
@@ -212,7 +202,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => backToDashboard(navigation, 'History')}
         >
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
@@ -231,7 +221,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
             source={{ uri: imageUri }}
             style={styles.image}
             onError={() => setImageMissing(true)}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         ) : (
           <View style={styles.noImage}>
@@ -251,7 +241,10 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
-          <InfoRow label="Screening ID" value={record.patient_id} />
+          <InfoRow
+            label="Screening ID"
+            value={screeningLabel(record.patient_id)}
+          />
           <View style={styles.divider} />
           <InfoRow label="Full Name" value={record.full_name} />
           <View style={styles.divider} />
@@ -260,40 +253,21 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           <InfoRow label="Sex" value={record.sex} />
           <View style={styles.divider} />
           <InfoRow label="Lesion Location" value={record.lesion_location} />
-        </View>
-
-        {/* Symptoms */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Selected Symptoms</Text>
-          <Text style={styles.subLabel}>ABCDE Criteria</Text>
-          {selectedAbcde.length > 0 ? (
-            selectedAbcde.map(s => (
-              <View key={s} style={styles.tagRow}>
-                <View style={styles.tagDot} />
-                <Text style={styles.tagText}>{s}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noneText}>None selected</Text>
-          )}
-          <Text style={[styles.subLabel, { marginTop: Spacing.md }]}>
-            Other Signs
-          </Text>
-          {selectedSymptoms.length > 0 ? (
-            selectedSymptoms.map(s => (
-              <View key={s} style={styles.tagRow}>
-                <View
-                  style={[
-                    styles.tagDot,
-                    { backgroundColor: Colors.primaryDark },
-                  ]}
-                />
-                <Text style={styles.tagText}>{s}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noneText}>None selected</Text>
-          )}
+          <InfoRow
+            label="Occupation"
+            value={record.occupation || 'Not recorded'}
+          />
+          <InfoRow
+            label="History of Sunburn"
+            value={
+              record.sunburn_history == null
+                ? 'Not recorded'
+                : record.sunburn_history === 1
+                ? 'Yes'
+                : 'No'
+            }
+          />
+          <SelectedSymptoms abcde={abcde} other={symptoms} />
         </View>
 
         {/* Classification Result */}
@@ -326,21 +300,15 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
           <InfoRow label="Threshold Status" value={record.threshold_status} />
         </View>
 
-        {/* Matching Visual Features */}
-        {features.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Matching Visual Features</Text>
-            {features.map((f, idx) => (
-              <View key={idx} style={styles.tagRow}>
-                <View style={styles.tagDot} />
-                <Text style={styles.tagText}>{f}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <LesionExplanationCard
+          lesion={record.predicted_lesion_type}
+          confidence={record.confidence_score}
+        />
 
-        {/* Medical Disclaimer */}
-        <DisclaimerCard type="medical" />
+        <DisclaimerCard
+          type="medical"
+          onReadMore={() => navigation.navigate('SettingsMedicalDisclaimer')}
+        />
 
         {/* Delete */}
         <AppButton
@@ -391,7 +359,7 @@ export const ReportScreen: React.FC<Props> = ({ navigation, route }) => {
               placeholder="Enter age"
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
-              maxLength={3}
+              accessibilityLabel="Age"
               returnKeyType="next"
             />
 

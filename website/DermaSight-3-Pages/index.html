@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="AI-assisted skin lesion awareness" />
+    <title>About DermaSight | DermaSight</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header>
+      <a class="brand" href="index.html">DermaSight</a>
+      <nav aria-label="Information pages">
+        <a href="index.html" aria-current="page">About</a
+        ><a href="privacy.html">Privacy & Data Consent</a
+        ><a href="medical-disclaimer.html">Medical Disclaimer</a>
+      </nav>
+    </header>
+    <main id="main">
+      <div class="eyebrow">EDUCATIONAL USE ONLY</div>
+      <h1>About DermaSight</h1>
+      <p class="intro">AI-assisted skin lesion awareness</p>
+      <p class="version">Development version · Updated October 30, 2026</p>
+      <aside>
+        Describes the current prototype. Public contact and hosting details are
+        pending finalization by the project team.
+      </aside>
+      <section>
+        <h2>Purpose and workflow</h2>
+        <p>
+          DermaSight supports educational screening through information entry,
+          symptoms, capture/gallery selection, image checks, automatic
+          lesion-region processing, on-device classification and local history.
+          It does not provide a final medical diagnosis.
+        </p>
+      </section>
+      <section>
+        <h2>Guest and registered use</h2>
+        <p>
+          Guests can screen without creating an account. Registered accounts
+          persist on the account server, while screening history remains on the
+          device where it was saved. Creating a new account from guest mode can
+          preserve that session’s scans. Local history is not a cross-device
+          cloud backup.
+        </p>
+      </section>
+      <section>
+        <h2>Phone storage, account server and cloud</h2>
+        <p>
+          Screenings and images stay on the phone. A separate SQLite account
+          database runs on the project Mac in the current development setup.
+          Google Sign-In verifies identity; it is not cloud storage for scans.
+          No cloud backup or automatic cross-device history synchronization is
+          configured.
+        </p>
+        <p>
+          These three public information pages can be hosted independently of
+          the app and account server. Publishing the pages does not publish
+          account records, screening photos or results.
+        </p>
+      </section>
+      <section>
+        <h2>Model and limitations</h2>
+        <p>
+          The app uses a HAM10000-trained EfficientNet model with TensorFlow
+          Lite. Skin-color filtering and segmentation are imperfect and can
+          confuse objects with skin. No clinical accuracy is guaranteed. Read
+          the medical disclaimer before interpreting predictions.
+        </p>
+      </section>
+      <section>
+        <h2>Privacy and support</h2>
+        <p>
+          Read Privacy &amp; Data Consent for data collection, storage, sign-in
+          connections and deletion choices. Contact the project team or
+          institution that supplied your app for support. A dedicated public
+          contact has not yet been supplied for this development version.
+        </p>
+      </section>
+      <section>
+        <h2>Further information</h2>
+        <p>
+          Use the navigation above to read our privacy and medical information.
+        </p>
+      </section>
+    </main>
+    <footer>
+      DermaSight · Educational screening only. Use your browser’s Back control
+      or switch back to the app to return.
+    </footer>
+  </body>
+</html>

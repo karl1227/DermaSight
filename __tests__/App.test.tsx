@@ -4,6 +4,8 @@ import { Text } from 'react-native';
 import { initDatabase } from '../src/database/database';
 import App from '../App';
 jest.mock('@react-native-community/netinfo', () => ({
+  configure: jest.fn(),
+  refresh: jest.fn(async () => ({})),
   addEventListener: jest.fn(() => () => {}),
 }));
 jest.mock('../src/database/database', () => ({ initDatabase: jest.fn() }));

@@ -10,6 +10,8 @@ export interface PatientInfo {
   age: number;
   sex: 'Male' | 'Female' | 'Other' | '';
   lesionLocation: string;
+  occupation?: string;
+  sunburnHistory?: boolean;
 }
 
 export interface ABCDEAnswers {
@@ -78,6 +80,8 @@ export interface ScreeningRecord {
   age: number;
   sex: string; // historical profile snapshot
   lesion_location: string;
+  occupation?: string | null;
+  sunburn_history?: number | null;
   selected_symptoms: string; // JSON
   abcde_answers: string; // JSON
   image_path: string;
@@ -113,6 +117,7 @@ export type RootStackParamList = {
   SymptomChecklist: { patientInfo: PatientInfo };
   Camera: { patientInfo: PatientInfo; symptoms: SelectedSymptoms };
   ConfirmImage: {
+    captureId?: string;
     imageEntry?: 'camera' | 'gallery';
     patientInfo: PatientInfo;
     symptoms: SelectedSymptoms;
@@ -156,7 +161,6 @@ export type RootStackParamList = {
 export type TabParamList = {
   Home: undefined;
   History: undefined;
-  Guide: undefined;
   Analytics: undefined;
   Profile: undefined;
 };

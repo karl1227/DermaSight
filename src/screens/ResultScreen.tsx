@@ -10,6 +10,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Image,
   TouchableOpacity,
   StatusBar,
   Alert,
@@ -19,7 +20,9 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../theme';
 import { AppButton } from '../components/AppButton';
-import { ResultBasisCard } from '../components/ResultBasisCard';
+import { LesionExplanationCard } from '../components/LesionExplanationCard';
+import { SelectedSymptoms } from '../components/SelectedSymptoms';
+import { screeningLabel } from '../utils/screeningInformation';
 import { DisclaimerCard } from '../components/DisclaimerCard';
 import { useAuth } from '../auth/AuthContext';
 import { insertScreening, historyEnabledFor } from '../database/database';
@@ -46,6 +49,7 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
   const savingLock = useRef(false);
   const savedIdRef = useRef<number | null>(null);
   const [saveError, setSaveError] = useState('');
+  const [imageMissing, setImageMissing] = useState(false);
 
   const isLowConfidence = result.thresholdStatus === 'Below Threshold';
   const statusColor = getStatusColor(result.screeningStatus);
@@ -85,6 +89,11 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
           age: patientInfo.age,
           sex: patientInfo.sex,
           lesion_location: patientInfo.lesionLocation,
+          occupation: patientInfo.occupation,
+          sunburn_history:
+            patientInfo.sunburnHistory == null
+              ? null
+              : Number(patientInfo.sunburnHistory),
           selected_symptoms: JSON.stringify(symptoms.other),
           abcde_answers: JSON.stringify(symptoms.abcde),
           image_path: savedImagePath,
@@ -153,51 +162,49 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Assessment message banner */}
-        <View
-          style={[styles.assessmentBanner, { borderLeftColor: statusColor }]}
-        >
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <View style={styles.assessmentContent}>
-            <Text style={styles.assessmentLabel}>Assessment Message</Text>
-            <Text style={[styles.assessmentMsg, { color: statusColor }]}>
-              {result.assessmentMessage}
-            </Text>
-          </View>
-        </View>
-
-        {/* Low confidence alert */}
-        {isLowConfidence && (
-          <View style={styles.lowConfCard}>
-            <Text style={styles.lowConfTitle}>Low Confidence Result</Text>
-            <Text style={styles.lowConfText}>
-              The image did not meet the minimum confidence threshold (70%) for
-              a reliable preliminary classification.
-            </Text>
-            <View style={styles.lowConfActions}>
-              <TouchableOpacity
-                style={styles.lowConfBtn}
-                onPress={() => retakeScreeningImage(navigation, route.params)}
-              >
-                <Text style={styles.lowConfBtnText}>Retake Image</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.lowConfBtn, styles.lowConfBtnSecondary]}
-                onPress={() => navigation.navigate('LesionGuide')}
-              >
-                <Text
-                  style={[styles.lowConfBtnText, { color: Colors.primary }]}
-                >
-                  Consult Guide
-                </Text>
-              </TouchableOpacity>
-            </View>
+        {imageUri && !imageMissing ? (
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.image}
+            resizeMode="contain"
+            accessibilityLabel="Screening image"
+            onError={() => setImageMissing(true)}
+          />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.summaryLabel}>No image available</Text>
           </View>
         )}
 
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Patient Information</Text>
+          {[
+            ['Screening ID', screeningLabel(patientInfo.screeningId)],
+            ['Full Name', patientInfo.fullName],
+            ['Age', String(patientInfo.age)],
+            ['Sex', patientInfo.sex],
+            ['Lesion Location', patientInfo.lesionLocation],
+            ['Occupation', patientInfo.occupation || 'Not recorded'],
+            [
+              'History of Sunburn',
+              patientInfo.sunburnHistory == null
+                ? 'Not recorded'
+                : patientInfo.sunburnHistory
+                ? 'Yes'
+                : 'No',
+            ],
+          ].map(([label, value]) => (
+            <View key={label} style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>{label}</Text>
+              <Text style={styles.summaryValue}>{value}</Text>
+            </View>
+          ))}
+          <SelectedSymptoms abcde={symptoms.abcde} other={symptoms.other} />
+        </View>
+
         {/* Result summary card */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Result Summary</Text>
+          <Text style={styles.summaryTitle}>Classification Result</Text>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Predicted Lesion Type</Text>
@@ -231,24 +238,64 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.divider} />
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Patient</Text>
-            <Text style={styles.summaryValue}>{patientInfo.fullName}</Text>
+            <Text style={styles.summaryLabel}>Threshold Status</Text>
+            <Text style={styles.summaryValue}>{result.thresholdStatus}</Text>
           </View>
-          <View style={styles.divider} />
+          {/* Assessment message banner */}
+          <View
+            style={[styles.assessmentBanner, { borderLeftColor: statusColor }]}
+          >
+            <View
+              style={[styles.statusDot, { backgroundColor: statusColor }]}
+            />
+            <View style={styles.assessmentContent}>
+              <Text style={styles.assessmentLabel}>Assessment Message</Text>
+              <Text style={[styles.assessmentMsg, { color: statusColor }]}>
+                {result.assessmentMessage}
+              </Text>
+            </View>
+          </View>
 
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Age / Sex</Text>
-            <Text style={styles.summaryValue}>
-              {patientInfo.age} · {patientInfo.sex}
-            </Text>
-          </View>
+          {/* Low confidence alert */}
+          {isLowConfidence && (
+            <View style={styles.lowConfCard}>
+              <Text style={styles.lowConfTitle}>Low Confidence Result</Text>
+              <Text style={styles.lowConfText}>
+                The model score is below the app’s 70% display threshold.
+                Retaking the image may improve clarity; it does not replace
+                professional assessment.
+              </Text>
+              <View style={styles.lowConfActions}>
+                <TouchableOpacity
+                  style={styles.lowConfBtn}
+                  onPress={() => retakeScreeningImage(navigation, route.params)}
+                >
+                  <Text style={styles.lowConfBtnText}>Retake Image</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.lowConfBtn, styles.lowConfBtnSecondary]}
+                  onPress={() => navigation.navigate('LesionGuide')}
+                >
+                  <Text
+                    style={[styles.lowConfBtnText, { color: Colors.primary }]}
+                  >
+                    Consult Guide
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Result basis */}
-        <ResultBasisCard result={result} />
-
-        {/* Medical disclaimer */}
-        <DisclaimerCard type="medical" />
+        <LesionExplanationCard
+          lesion={result.predictedLesionType}
+          confidence={result.confidenceScore}
+        />
+        <DisclaimerCard
+          type="medical"
+          onReadMore={() => navigation.navigate('SettingsMedicalDisclaimer')}
+        />
 
         {/* Action buttons */}
         {saveError ? (
@@ -302,6 +349,19 @@ export const ResultScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  image: {
+    width: '100%',
+    height: 280,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    marginBottom: Spacing.base,
+  },
+  imagePlaceholder: {
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.base,
+  },
   header: {
     backgroundColor: Colors.primary,
     paddingTop: Spacing.xxxl,

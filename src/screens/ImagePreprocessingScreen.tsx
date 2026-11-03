@@ -23,7 +23,10 @@ import {
 } from '../services/preprocessingService';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'ImagePreprocessing'>;
+  navigation: NativeStackNavigationProp<
+    RootStackParamList,
+    'ImagePreprocessing'
+  >;
   route: RouteProp<RootStackParamList, 'ImagePreprocessing'>;
 };
 
@@ -38,12 +41,16 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
   navigation,
   route,
 }) => {
-  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType } = route.params;
+  const { patientInfo, symptoms, imageUri, imagePath, imageData, imageType } =
+    route.params;
   const sourceImagePath = imagePath ?? imageUri;
 
   const [stepStates, setStepStates] = useState<Record<string, StepState>>(
     Object.fromEntries(
-      PREPROCESSING_STEPS.map(s => [s.id, { started: false, completed: false }]),
+      PREPROCESSING_STEPS.map(s => [
+        s.id,
+        { started: false, completed: false },
+      ]),
     ),
   );
   const [processedUri, setProcessedUri] = useState<string | null>(null);
@@ -54,6 +61,7 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
 
   /** Start preprocessing when the screen mounts */
   useEffect(() => {
+    let active = true;
     const interaction = InteractionManager.runAfterInteractions(() => {
       setIsRunning(true);
       setError(null);
@@ -64,6 +72,7 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
           filePath: sourceImagePath,
         },
         (stepId, completed) => {
+          if (!active) return;
           setStepStates(prev => ({
             ...prev,
             [stepId]: { started: true, completed },
@@ -71,23 +80,30 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
         },
       )
         .then(result => {
+          if (!active) return;
           setProcessedUri(result.processedImagePath);
           setPreprocessingId(result.id);
           setIsRunning(false);
           setIsDone(true);
         })
         .catch(err => {
-          const message = err instanceof Error ? err.message : 'Unknown preprocessing error';
+          if (!active) return;
+          const message =
+            err instanceof Error ? err.message : 'Unknown preprocessing error';
           setError(`Preprocessing failed: ${message}`);
           setIsRunning(false);
         });
     });
 
-    return () => interaction.cancel();
+    return () => {
+      active = false;
+      interaction.cancel();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceImagePath, imageUri]);
 
   const handleContinue = () => {
+    if (!isDone || isRunning || error || !preprocessingId) return;
     navigation.replace('AIClassification', {
       patientInfo,
       symptoms,
@@ -114,7 +130,8 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => !isRunning && navigation.goBack()}
-          disabled={isRunning}>
+          disabled={isRunning}
+        >
           <Text style={[styles.backText, isRunning && { opacity: 0.4 }]}>
             ← Back
           </Text>
@@ -128,8 +145,8 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Image preview */}
         <View style={styles.imageWrapper}>
           <Image
@@ -163,14 +180,16 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
                   state.completed && styles.stepRowDone,
                   state.started && !state.completed && styles.stepRowActive,
                   idx === PREPROCESSING_STEPS.length - 1 && styles.stepRowLast,
-                ]}>
+                ]}
+              >
                 <Text style={styles.stepIcon}>{renderStepIcon(step)}</Text>
                 <View style={styles.stepContent}>
                   <Text
                     style={[
                       styles.stepLabel,
                       state.completed && styles.stepLabelDone,
-                    ]}>
+                    ]}
+                  >
                     {step.label}
                   </Text>
                   <Text style={styles.stepDesc}>{step.description}</Text>
@@ -188,8 +207,8 @@ export const ImagePreprocessingScreen: React.FC<Props> = ({
           <View style={styles.doneCard}>
             <Text style={styles.doneCardTitle}>Ready for CNN Analysis</Text>
             <Text style={styles.doneCardText}>
-              Image tensor has been prepared as Float32 RGB data with shape
-              [1, 224, 224, 3] for EfficientNet classification.
+              Image tensor has been prepared as Float32 RGB data with shape [1,
+              224, 224, 3] for EfficientNet classification.
             </Text>
           </View>
         )}

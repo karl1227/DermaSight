@@ -1,4 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import {
+  prepareCapture,
+  type PreparedCapture,
+} from '../services/capturePreparationService';
+import { cachePreparedCapture } from '../services/preparedCaptureCache';
+import { LesionRegionPreview } from '../components/LesionRegionPreview';
+import { secureId } from '../utils/secureId';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +16,8 @@ import {
   PermissionsAndroid,
   Platform,
   ActivityIndicator,
+  AppState,
+  Image,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useIsFocused } from '@react-navigation/native';
@@ -16,6 +25,7 @@ import {
   Camera,
   runAtTargetFps,
   useCameraDevice,
+  useCameraFormat,
   useFrameProcessor,
 } from 'react-native-vision-camera';
 import {
@@ -47,6 +57,16 @@ type LiveQuality = {
   message: string;
 };
 
+type CapturedImage = {
+  uri: string;
+  path?: string;
+  base64?: string;
+  type?: string;
+  width?: number;
+  height?: number;
+  fileSize?: number;
+  entry?: 'camera' | 'gallery';
+};
 const INITIAL_LIVE_QUALITY: LiveQuality = {
   brightness: 0,
   sharpness: 0,
@@ -58,15 +78,47 @@ const INITIAL_LIVE_QUALITY: LiveQuality = {
 export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const { patientInfo, symptoms } = route.params;
   const [loading, setLoading] = useState(false);
+  const [foreground, setForeground] = useState(
+    AppState.currentState === 'active',
+  );
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state =>
+      setForeground(state === 'active'),
+    );
+    return () => subscription.remove();
+  }, []);
   const [hasPermission, setHasPermission] = useState(false);
   const [lightMode, setLightMode] = useState<LightMode>('auto');
   const [liveQuality, setLiveQuality] =
     useState<LiveQuality>(INITIAL_LIVE_QUALITY);
   const cameraRef = useRef<Camera>(null);
+  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
+  const [captured, setCaptured] = useState<CapturedImage | null>(null);
+  const [capturePrepared, setCapturePrepared] =
+    useState<PreparedCapture | null>(null);
+  const [captureStage, setCaptureStage] = useState('');
+  const [captureError, setCaptureError] = useState('');
+  const captureRequest = useRef(0);
+  const captureInFlight = useRef(false);
+  const mounted = useRef(true);
+  const invalidateCapture = useCallback(() => {
+    captureRequest.current++;
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      invalidateCapture();
+    };
+  }, [invalidateCapture]);
   const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>(
     'back',
   );
   const device = useCameraDevice(cameraPosition);
+  const format = useCameraFormat(device, [
+    { photoResolution: 'max' },
+    { videoResolution: { width: 1280, height: 720 } },
+  ]);
   const oppositeDevice = useCameraDevice(
     cameraPosition === 'back' ? 'front' : 'back',
   );
@@ -77,6 +129,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const previousSignature = useSharedValue<number[]>([]);
 
   const publishLiveQuality = useRunOnJS((next: LiveQuality) => {
+    if (!mounted.current) return;
     setLiveQuality(current =>
       current.status === next.status &&
       current.message === next.message &&
@@ -174,17 +227,71 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     setHasPermission(status === 'granted');
   }, []);
 
-  const navigateToConfirm = (image: {
-    uri: string;
-    path?: string;
-    base64?: string;
-    type?: string;
-    width?: number;
-    height?: number;
-    fileSize?: number;
-    entry?: 'camera' | 'gallery';
-  }) => {
-    navigation.navigate('ConfirmImage', {
+  const retakeCapture = () => {
+    captureRequest.current++;
+    captureInFlight.current = false;
+    setCaptured(null);
+    setCapturePrepared(null);
+    setCaptureError('');
+    setLoading(false);
+  };
+  const navigateToConfirm = async (image: CapturedImage) => {
+    if (!mounted.current || !isFocused) return;
+    const requestId = ++captureRequest.current;
+    setCaptured(image);
+    setCapturePrepared(null);
+    setCaptureError('');
+    setLoading(true);
+    try {
+      const prepared = await prepareCapture(
+        {
+          filePath: image.path ?? image.uri,
+          base64: image.base64,
+          mimeType: image.type,
+        },
+        { width: image.width, height: image.height, fileSize: image.fileSize },
+        stage => {
+          if (mounted.current && captureRequest.current === requestId)
+            setCaptureStage(stage);
+        },
+        () => !mounted.current || captureRequest.current !== requestId,
+      );
+      if (mounted.current && captureRequest.current === requestId)
+        setCapturePrepared(prepared);
+    } catch (error) {
+      if (mounted.current && captureRequest.current === requestId)
+        setCaptureError(
+          error instanceof Error
+            ? error.message
+            : 'Could not prepare this photo. Retake it.',
+        );
+    }
+  };
+  const openPreparedReview = () => {
+    if (
+      !captured ||
+      !capturePrepared ||
+      captureError ||
+      !mounted.current ||
+      !isFocused
+    )
+      return;
+    const captureId = secureId();
+    cachePreparedCapture(
+      captureId,
+      patientInfo.owner,
+      captured.path ?? captured.uri,
+      capturePrepared,
+    );
+    const image = captured;
+    captureRequest.current++;
+    captureInFlight.current = false;
+    setLightMode(mode => (mode === 'on' ? 'auto' : mode));
+    setCaptured(null);
+    setCapturePrepared(null);
+    setLoading(false);
+    navigation.push('ConfirmImage', {
+      captureId,
       imageEntry: image.entry ?? 'camera',
       patientInfo,
       symptoms,
@@ -251,7 +358,8 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
           : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
       const granted = await PermissionsAndroid.request(permission, {
         title: 'Gallery Permission',
-        message: 'DermaSight needs gallery access to select skin lesion images.',
+        message:
+          'DermaSight needs gallery access to select skin lesion images.',
         buttonPositive: 'Allow',
         buttonNegative: 'Deny',
       });
@@ -262,6 +370,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleCapture = async () => {
+    if (captureInFlight.current || captured) return;
     if (!hasPermission) {
       const granted = await requestCameraPermission();
       if (!granted) return;
@@ -276,26 +385,38 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }
 
     try {
+      captureInFlight.current = true;
       setLoading(true);
       const photo = await cameraRef.current.takePhoto({
-        flash: device?.hasFlash ? lightMode : 'off',
+        // Auto lights only the still capture; native flash turns itself off afterward.
+        // Explicit On uses continuous torch, so do not also fire the flash.
+        flash:
+          lightMode === 'on' && supportsTorch
+            ? 'off'
+            : device?.hasFlash
+            ? lightMode === 'auto'
+              ? 'on'
+              : lightMode
+            : 'off',
         enableShutterSound: true,
       });
-      setLoading(false);
 
-      navigateToConfirm({
+      await navigateToConfirm({
         uri: `file://${photo.path}`,
         path: photo.path,
         type: 'image/jpeg',
         width: photo.width,
         height: photo.height,
       });
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Could not capture image.';
-      Alert.alert('Capture Failed', message);
-    } finally {
-      setLoading(false);
+    } catch {
+      if (mounted.current) {
+        captureInFlight.current = false;
+        setLoading(false);
+        Alert.alert(
+          'Capture Failed',
+          'The camera could not finish taking the photo. Try again with Light Auto or Off. Your screening information is preserved.',
+        );
+      }
     }
   };
 
@@ -330,7 +451,8 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const canShowCamera = hasPermission && device;
+  const canShowCamera =
+    hasPermission && device && isFocused && foreground && !captured;
   const supportsTorch = Boolean(device?.hasTorch);
   const nextLightMode: Record<LightMode, LightMode> = {
     auto: 'on',
@@ -359,6 +481,7 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
           {supportsTorch ? (
             <TouchableOpacity
               onPress={() => setLightMode(mode => nextLightMode[mode])}
+              disabled={loading || !!captured}
               style={[
                 styles.torchBtn,
                 lightMode !== 'off' && styles.torchBtnActive,
@@ -393,16 +516,37 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
           </Text>
         </View>
 
-        <View style={styles.cameraShell}>
+        <View
+          style={styles.cameraShell}
+          onLayout={event => setPreviewSize(event.nativeEvent.layout)}
+        >
           {canShowCamera ? (
             <Camera
               ref={cameraRef}
               style={StyleSheet.absoluteFill}
               device={device}
-              isActive={isFocused}
-              torch={supportsTorch && lightMode !== 'off' ? 'on' : 'off'}
+              format={format}
+              isActive={isFocused && foreground && !captured}
+              torch={
+                supportsTorch &&
+                isFocused &&
+                foreground &&
+                lightMode === 'on' &&
+                !captured
+                  ? 'on'
+                  : 'off'
+              }
               photo
-              frameProcessor={frameProcessor}
+              photoQualityBalance="quality"
+              pixelFormat="yuv"
+              enableBufferCompression={false}
+              videoHdr={false}
+              frameProcessor={
+                isFocused && foreground && !captured
+                  ? frameProcessor
+                  : undefined
+              }
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.cameraFallback}>
@@ -429,83 +573,135 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
 
-          <View pointerEvents="none" style={styles.guidanceOverlay}>
-            <View style={styles.scanFrame}>
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-              <View style={styles.centerDot} />
-            </View>
+          {!captured && (
+            <View pointerEvents="none" style={styles.guidanceOverlay}>
+              <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+                <View style={styles.centerDot} />
+              </View>
 
-            <View style={styles.bottomGuide}>
-              <Text style={styles.guideText}>
-                Place lesion inside frame & hold steady
-              </Text>
-            </View>
+              <View style={styles.bottomGuide}>
+                <Text style={styles.guideText}>
+                  Place lesion inside frame & hold steady
+                </Text>
+              </View>
 
-            <View
-              style={[
-                styles.liveQualityBadge,
-                liveQuality.status === 'ready'
-                  ? styles.liveQualityReady
-                  : liveQuality.status === 'warning'
-                  ? styles.liveQualityWarning
-                  : styles.liveQualityChecking,
-              ]}
-            >
-              <Text style={styles.liveQualityText}>{liveQuality.message}</Text>
+              <View
+                style={[
+                  styles.liveQualityBadge,
+                  liveQuality.status === 'ready'
+                    ? styles.liveQualityReady
+                    : liveQuality.status === 'warning'
+                    ? styles.liveQualityWarning
+                    : styles.liveQualityChecking,
+                ]}
+              >
+                <Text style={styles.liveQualityText}>
+                  {liveQuality.message}
+                </Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.captureControls}>
-            <TouchableOpacity
-              style={styles.smallControl}
-              onPress={handleGallery}
-              disabled={loading}
-              accessibilityRole="button"
-              accessibilityLabel="Open gallery"
-            >
-              <LineIcon name="gallery" color={Colors.primary} size={27} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.captureControl,
-                (loading || !canShowCamera) && styles.controlDisabled,
-              ]}
-              onPress={handleCapture}
-              disabled={loading || !canShowCamera}
-              accessibilityRole="button"
-              accessibilityLabel="Capture image"
-            >
-              {loading ? (
-                <ActivityIndicator color={Colors.white} size="large" />
+          )}
+          {captured && (
+            <View style={styles.frozenCapture}>
+              {capturePrepared && !captureError ? (
+                <LesionRegionPreview
+                  key={capturePrepared.preprocessing.id}
+                  original={capturePrepared.originalImage}
+                  selected={capturePrepared.image}
+                  bounds={capturePrepared.lesionBounds}
+                  cropped={capturePrepared.cropped}
+                  size={Math.min(
+                    previewSize.width || 300,
+                    previewSize.height || 300,
+                  )}
+                  mode="crop"
+                  onComplete={openPreparedReview}
+                  onError={() =>
+                    setCaptureError(
+                      'The preview could not load. Please retake the image.',
+                    )
+                  }
+                />
               ) : (
-                <LineIcon name="camera" color={Colors.white} size={38} />
+                <Image
+                  source={{ uri: captured.uri }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="contain"
+                />
               )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.smallControl,
-                (!oppositeDevice || loading) && styles.controlDisabled,
-              ]}
-              disabled={!oppositeDevice || loading}
-              accessibilityRole="button"
-              accessibilityLabel={
-                cameraPosition === 'back'
-                  ? 'Switch to front camera'
-                  : 'Switch to back camera'
-              }
-              onPress={() => {
-                setCameraPosition(position =>
-                  position === 'back' ? 'front' : 'back',
-                );
-                previousSignature.value = [];
-                setLiveQuality(INITIAL_LIVE_QUALITY);
-              }}
-            >
-              <LineIcon name="switchCamera" color={Colors.primary} size={27} />
-            </TouchableOpacity>
-          </View>
+              {!capturePrepared && !captureError && (
+                <ActivityIndicator color={Colors.white} size="large" />
+              )}
+              <Text style={styles.captureStage}>
+                {captureError || captureStage}
+              </Text>
+              <AppButton
+                label="Retake Image"
+                variant="outline"
+                onPress={retakeCapture}
+                fullWidth={false}
+              />
+            </View>
+          )}
+          {!captured && (
+            <View style={styles.captureControls}>
+              <TouchableOpacity
+                style={styles.smallControl}
+                onPress={handleGallery}
+                disabled={loading}
+                accessibilityRole="button"
+                accessibilityLabel="Open gallery"
+              >
+                <LineIcon name="gallery" color={Colors.primary} size={27} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.captureControl,
+                  (loading || !canShowCamera) && styles.controlDisabled,
+                ]}
+                onPress={handleCapture}
+                disabled={loading || !canShowCamera}
+                accessibilityRole="button"
+                accessibilityLabel="Capture image"
+              >
+                {loading ? (
+                  <ActivityIndicator color={Colors.white} size="large" />
+                ) : (
+                  <LineIcon name="camera" color={Colors.white} size={38} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.smallControl,
+                  (!oppositeDevice || loading) && styles.controlDisabled,
+                ]}
+                disabled={!oppositeDevice || loading}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  cameraPosition === 'back'
+                    ? 'Switch to front camera'
+                    : 'Switch to back camera'
+                }
+                onPress={() => {
+                  setCameraPosition(position =>
+                    position === 'back' ? 'front' : 'back',
+                  );
+                  previousSignature.value = [];
+                  setLiveQuality(INITIAL_LIVE_QUALITY);
+                }}
+              >
+                <LineIcon
+                  name="switchCamera"
+                  color={Colors.primary}
+                  size={27}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -513,6 +709,20 @@ export const CameraScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
+  frozenCapture: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#152827',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    padding: 12,
+  },
+  captureStage: {
+    color: Colors.white,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+  },
+
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
     backgroundColor: Colors.primary,

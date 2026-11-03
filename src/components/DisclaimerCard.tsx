@@ -1,15 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 interface DisclaimerCardProps {
   type?: 'medical' | 'privacy' | 'educational';
+  onReadMore?: () => void;
 }
 
 const DISCLAIMER_CONTENT = {
   medical: {
-    title: 'Medical Disclaimer',
-    text: 'This result is not a medical diagnosis. The confidence score only represents the model\'s certainty based on image features and checklist inputs — not clinical certainty. Only a licensed dermatologist can confirm any skin condition through proper clinical evaluation. DermaSight is designed for preliminary educational screening only.',
+    title: 'Unsure? See a dermatologist',
+    text: 'This is a preliminary screening estimate, not a diagnosis. If you are unsure or concerned about the lesion, consult a licensed dermatologist regardless of the result or confidence score—even if it says Low Risk. Do not delay professional assessment because of an app result.',
   },
   privacy: {
     title: 'Privacy Notice',
@@ -23,6 +24,7 @@ const DISCLAIMER_CONTENT = {
 
 export const DisclaimerCard: React.FC<DisclaimerCardProps> = ({
   type = 'medical',
+  onReadMore,
 }) => {
   const content = DISCLAIMER_CONTENT[type];
 
@@ -30,11 +32,40 @@ export const DisclaimerCard: React.FC<DisclaimerCardProps> = ({
     <View style={styles.container}>
       <Text style={styles.title}>{content.title}</Text>
       <Text style={styles.text}>{content.text}</Text>
+      {type === 'medical' && (
+        <Text style={[styles.text, styles.followUp]}>
+          Seek assessment for a new, changing, bleeding or non-healing spot.
+        </Text>
+      )}
+      {onReadMore && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={onReadMore}
+          style={styles.readMore}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.readMoreText}>Read Medical Disclaimer</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  followUp: { marginTop: Spacing.sm },
+  readMore: {
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.xs,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  readMoreText: {
+    color: Colors.primaryDark,
+    fontSize: Typography.sm,
+    fontWeight: Typography.semiBold,
+    textDecorationLine: 'underline',
+  },
   container: {
     backgroundColor: Colors.warningLight,
     borderRadius: Radius.lg,

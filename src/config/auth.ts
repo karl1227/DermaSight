@@ -1,5 +1,7 @@
+import { developmentBackendUrl } from './developmentServer';
+
 // Public URL only. LAN HTTP is allowed only in development; release needs your HTTPS endpoint.
-export const AUTH_API_URL: string = __DEV__ ? 'http://192.168.3.14:3001' : '';
+export const AUTH_API_URL: string = __DEV__ ? developmentBackendUrl() : '';
 
 // Public OAuth client IDs only; never put a client secret here. See GOOGLE_SIGN_IN_SETUP.md.
 export const GOOGLE_WEB_CLIENT_ID: string =

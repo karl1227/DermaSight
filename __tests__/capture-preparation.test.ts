@@ -2,7 +2,7 @@ import { prepareCapture } from '../src/services/capturePreparationService';
 import { validateSkin } from '../src/services/skinValidationService';
 import {
   assessImageQuality,
-  cropImageToJpeg,
+  isOriginalJpegSource,
 } from '../src/services/imageProcessingService';
 import { createAutomaticAreaOfInterest } from '../src/services/segmentationService';
 import { runPreprocessing } from '../src/services/preprocessingService';
@@ -24,7 +24,7 @@ jest.mock('../src/services/skinValidationService', () => ({
 }));
 jest.mock('../src/services/imageProcessingService', () => ({
   assessImageQuality: jest.fn(),
-  cropImageToJpeg: jest.fn(),
+  isOriginalJpegSource: jest.fn(),
 }));
 jest.mock('../src/services/segmentationService', () => ({
   createAutomaticAreaOfInterest: jest.fn(),
@@ -36,11 +36,11 @@ const quality = assessImageQuality as jest.Mock;
 const skin = validateSkin as jest.Mock;
 const aoi = createAutomaticAreaOfInterest as jest.Mock;
 const preprocessing = runPreprocessing as jest.Mock;
-const crop = cropImageToJpeg as jest.Mock;
 const source = { filePath: '/original.jpg' };
 beforeEach(() => {
   jest.clearAllMocks();
   skin.mockResolvedValue('model');
+  (isOriginalJpegSource as jest.Mock).mockResolvedValue(true);
   quality.mockResolvedValue({
     metrics: { brightness: 120, sharpness: 20, width: 1024, height: 768 },
   });
@@ -53,12 +53,12 @@ beforeEach(() => {
     inputRange: '0-255',
   });
 });
-test('skin rejection stops quality, cropping and preprocessing', async () => {
+test('skin rejection blocks preprocessing without running U-Net', async () => {
   skin.mockRejectedValue(new Error('Human skin could not be confirmed.'));
   await expect(prepareCapture(source, undefined, jest.fn())).rejects.toThrow(
     'Human skin',
   );
-  expect(quality).not.toHaveBeenCalled();
+  expect(quality).toHaveBeenCalledTimes(1);
   expect(aoi).not.toHaveBeenCalled();
   expect(preprocessing).not.toHaveBeenCalled();
 });
@@ -86,46 +86,40 @@ test.each([
     expect(preprocessing).not.toHaveBeenCalled();
   },
 );
-test('validated crop is the source passed to existing preprocessing', async () => {
-  const image = {
-    uri: 'file:///roi.jpg',
-    path: '/roi.jpg',
-    width: 500,
-    height: 500,
-    fileSize: 30000,
-  };
-  aoi.mockResolvedValue({ image });
-  const stages: string[] = [];
-  const result = await prepareCapture(source, undefined, stage =>
-    stages.push(stage),
-  );
-  expect(result.cropped).toBe(true);
-  expect(result.image).toEqual(image);
-  expect(preprocessing).toHaveBeenCalledWith(
-    { filePath: '/roi.jpg', mimeType: 'image/jpeg' },
-    expect.any(Function),
-  );
-  expect(stages).toEqual([
-    'Preparing image',
-    'Checking for skin',
-    'Checking image quality',
-    'Finding the lesion',
-    'Preparing for analysis',
-  ]);
-});
-test('segmentation failure uses the validated original; small ROI is not enlarged', async () => {
-  aoi.mockRejectedValueOnce(new Error('unavailable'));
-  expect((await prepareCapture(source, undefined, jest.fn())).image.path).toBe(
-    '/normalized.jpg',
-  );
-  aoi.mockResolvedValueOnce({
-    image: { path: '/tiny.jpg', width: 10, height: 10 },
-  });
-  expect((await prepareCapture(source, undefined, jest.fn())).image.path).toBe(
-    '/normalized.jpg',
-  );
-});
-test('retake cancellation prevents downstream work', async () => {
+test.each(['/camera.jpg', '/gallery.jpg'])(
+  'full photo is preprocessed without U-Net for %s',
+  async filePath => {
+    // Even a model that could propose a crop must never be called in this flow.
+    aoi.mockResolvedValue({
+      image: { path: '/roi.jpg', width: 500, height: 500 },
+    });
+    const stages: string[] = [];
+    const result = await prepareCapture({ filePath }, undefined, stage =>
+      stages.push(stage),
+    );
+    expect(result.cropped).toBe(false);
+    expect(result.lesionBounds).toBeUndefined();
+    expect(result.image).toBe(result.originalImage);
+    expect(result.image.path).toBe(filePath);
+    expect(aoi).not.toHaveBeenCalled();
+    expect(skin).toHaveBeenCalledTimes(1);
+    expect(skin).toHaveBeenCalledWith(
+      { filePath: '/normalized.jpg', mimeType: 'image/jpeg' },
+      'capture',
+    );
+    expect(preprocessing).toHaveBeenCalledWith(
+      { filePath, mimeType: 'image/jpeg' },
+      expect.any(Function),
+    );
+    expect(stages).toEqual([
+      'Preparing image',
+      'Checking image quality',
+      'Checking for skin',
+      'Preparing for analysis',
+    ]);
+  },
+);
+test('retake cancellation during validation prevents preprocessing', async () => {
   let cancelled = false;
   skin.mockImplementationOnce(async () => {
     cancelled = true;
@@ -133,31 +127,31 @@ test('retake cancellation prevents downstream work', async () => {
   await expect(
     prepareCapture(source, undefined, jest.fn(), () => cancelled),
   ).rejects.toThrow('cancelled');
-  expect(quality).not.toHaveBeenCalled();
+  expect(quality).toHaveBeenCalledTimes(1);
   expect(preprocessing).not.toHaveBeenCalled();
 });
-test('manual zoom crops actual pixels, rechecks skin and preprocesses the zoomed ROI', async () => {
-  crop.mockResolvedValue({
-    uri: 'file:///zoom.jpg',
-    path: '/zoom.jpg',
-    width: 512,
-    height: 384,
-  });
+test('a retaken non-skin image is checked again after a previous accepted image', async () => {
+  await prepareCapture(source, undefined, jest.fn());
+  jest.clearAllMocks();
+  skin.mockRejectedValueOnce(new Error('Skin could not be confirmed.'));
+  await expect(
+    prepareCapture({ filePath: '/retake.jpg' }, undefined, jest.fn()),
+  ).rejects.toThrow('Skin');
+  expect(skin).toHaveBeenCalledTimes(1);
+  expect(preprocessing).not.toHaveBeenCalled();
+  expect(aoi).not.toHaveBeenCalled();
+});
+
+test('non-JPEG or inaccessible original keeps native format conversion', async () => {
+  (isOriginalJpegSource as jest.Mock).mockResolvedValue(false);
   const result = await prepareCapture(
-    source,
+    { filePath: '/gallery.heic', mimeType: 'image/heic' },
     undefined,
     jest.fn(),
-    () => false,
-    2,
   );
-  expect(result.image.path).toBe('/zoom.jpg');
-  expect(crop).toHaveBeenCalledWith(
-    { filePath: '/normalized.jpg' },
-    { left: 0.25, top: 0.25, right: 0.75, bottom: 0.75 },
-  );
-  expect(skin).toHaveBeenCalledTimes(2);
+  expect(result.image.path).toBe('/normalized.jpg');
   expect(preprocessing).toHaveBeenCalledWith(
-    { filePath: '/zoom.jpg', mimeType: 'image/jpeg' },
+    { filePath: '/normalized.jpg', mimeType: 'image/jpeg' },
     expect.any(Function),
   );
 });

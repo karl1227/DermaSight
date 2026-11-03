@@ -121,6 +121,12 @@ async function initialize(): Promise<void> {
       );
     if (!columns.includes('screening_id'))
       await tx.execute('ALTER TABLE screenings ADD COLUMN screening_id TEXT');
+    if (!columns.includes('occupation'))
+      await tx.execute('ALTER TABLE screenings ADD COLUMN occupation TEXT');
+    if (!columns.includes('sunburn_history'))
+      await tx.execute(
+        'ALTER TABLE screenings ADD COLUMN sunburn_history INTEGER CHECK (sunburn_history IN (0, 1))',
+      );
     // Keep pre-account history intact and unassigned. Never expose it to a new account.
     await tx.execute(
       "UPDATE screenings SET screening_id = 'legacy-' || id WHERE screening_id IS NULL",
@@ -140,7 +146,7 @@ async function initialize(): Promise<void> {
         WHEN (NEW.user_id IS NULL) = (NEW.guest_session_id IS NULL)
         BEGIN SELECT RAISE(ABORT, 'A screening must have exactly one owner'); END`);
     }
-    await tx.execute('PRAGMA user_version = 2');
+    await tx.execute('PRAGMA user_version = 3');
   });
 }
 
@@ -202,8 +208,8 @@ export async function insertScreening(
       selected_symptoms, abcde_answers, image_path,
       predicted_lesion_type, confidence_score, screening_status,
       threshold_status, matching_visual_features, recommendation_basis,
-      recommendation, created_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(screening_id) DO NOTHING`,
+      recommendation, created_at, occupation, sunburn_history
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(screening_id) DO NOTHING`,
     [
       record.screening_id,
       ownership.column === 'user_id' ? owner.id : null,
@@ -224,6 +230,8 @@ export async function insertScreening(
       record.recommendation_basis,
       record.recommendation,
       record.created_at,
+      record.occupation ?? null,
+      record.sunburn_history ?? null,
     ],
   );
 

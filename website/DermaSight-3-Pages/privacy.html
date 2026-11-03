@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      name="description"
+      content="How DermaSight handles your information"
+    />
+    <title>Privacy &amp; Data Consent | DermaSight</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header>
+      <a class="brand" href="index.html">DermaSight</a>
+      <nav aria-label="Information pages">
+        <a href="index.html">About</a
+        ><a href="privacy.html" aria-current="page">Privacy & Data Consent</a
+        ><a href="medical-disclaimer.html">Medical Disclaimer</a>
+      </nav>
+    </header>
+    <main id="main">
+      <div class="eyebrow">EDUCATIONAL USE ONLY</div>
+      <h1>Privacy &amp; Data Consent</h1>
+      <p class="intro">How DermaSight handles your information</p>
+      <p class="version">Development version · Updated October 30, 2026</p>
+      <aside>
+        Describes the current prototype. Public contact and hosting details are
+        pending finalization by the project team.
+      </aside>
+      <section>
+        <h2>Scope and responsibility</h2>
+        <p>
+          This notice describes the current DermaSight educational prototype.
+          The team providing your app operates its account service. Contact that
+          team through your app distributor or institution for questions,
+          access, correction, and deletion. A dedicated public contact and final
+          hosting details have not yet been supplied; the team must finalize
+          these before public distribution.
+        </p>
+      </section>
+      <section>
+        <h2>Information collected</h2>
+        <p>
+          Profiles contain name, email, sex, account identifiers and sign-in
+          method. A screening may contain a name/sex snapshot, age, lesion
+          location, occupation, history of sunburn, symptom answers, an image,
+          predictions, confidence scores, and timestamps. Provide only
+          information and images you are authorized to use. Avoid identifying
+          surroundings and other people when unnecessary.
+        </p>
+      </section>
+      <section>
+        <h2>Purposes</h2>
+        <p>
+          Profile data populates forms and supports authentication. Screening
+          data supports educational image analysis and local history. Occupation
+          and sunburn answers provide context; they do not change the current
+          image model prediction. Ownership identifiers separate guest sessions
+          and registered accounts.
+        </p>
+      </section>
+      <section>
+        <h2>Local processing and storage</h2>
+        <p>
+          Image checks, segmentation and TensorFlow Lite inference run on your
+          device. SQLite stores saved screening records; local files store
+          images. This implementation does not upload scan photos/results,
+          automatically train models with your images, or synchronize screening
+          history across devices. Signing in elsewhere does not restore another
+          device’s local scans.
+        </p>
+      </section>
+      <section>
+        <h2>Where your information is stored</h2>
+        <ul>
+          <li>
+            <strong>On your phone:</strong> SQLite through op-sqlite stores
+            screening details, guest sessions, predictions and history. Images
+            are saved as local files.
+          </li>
+          <li>
+            <strong>Secure phone storage:</strong> login/session credentials use
+            the platform secure credential store, including iOS Keychain.
+          </li>
+          <li>
+            <strong>On the account server:</strong> a separate SQLite database
+            stores account profiles, linked identities, salted password hashes
+            and authentication sessions. In the current development setup, this
+            server runs on the project Mac.
+          </li>
+          <li>
+            <strong>Cloud storage:</strong> no cloud database, cloud image
+            storage or automatic screening backup is configured.
+          </li>
+        </ul>
+        <p>
+          Google Sign-In verifies identity; it does not store your screening
+          images or history. Signing in on another phone does not restore this
+          phone’s saved scans. Hosting these public information pages does not
+          move the account server or upload screening data to that website.
+        </p>
+      </section>
+      <section>
+        <h2>Account service and Google</h2>
+        <p>
+          Registration sends account details and the password to the account
+          service, which stores salted password hashes rather than plaintext
+          passwords. Google Sign-In sends a Google identity token to that
+          service for verification; it does not grant access to your Gmail
+          inbox. The server stores profiles, linked identities and hashed
+          session identifiers. Google applies its own privacy practices to its
+          sign-in service.
+        </p>
+      </section>
+      <section>
+        <h2>Guests and account changes</h2>
+        <p>
+          Guest mode does not create a registered account. Guest scans belong to
+          the current local guest session. Creating a new account from that
+          session can transfer its scans to that account. Signing in to an
+          existing account does not automatically adopt unrelated guest scans.
+          Exiting guest mode ends access to that guest session; it does not
+          guarantee immediate erasure of its stored data.
+        </p>
+      </section>
+      <section>
+        <h2>Permissions and connectivity</h2>
+        <p>
+          Camera permission supports capture. Gallery selection uses the
+          platform photo picker and any required photo permission. Manage
+          permissions in device settings. Internet is needed for account
+          sign-in, profile updates and browser pages. Local inference does not
+          require internet once the app and models are installed. Revoking
+          permission does not erase existing records.
+        </p>
+      </section>
+      <section>
+        <h2>Internet connection checks</h2>
+        <p>
+          The Online/Offline indicator makes small connectivity requests to
+          Google’s connectivity-check service while the app is active. That
+          service receives ordinary connection information such as your IP
+          address; no account identifiers, screening photos or results are sent
+          with this check. A blocked check endpoint can make the indicator
+          report Offline even when another service is reachable.
+        </p>
+      </section>
+      <section>
+        <h2>Retention and deletion</h2>
+        <p>
+          You may disable future history saving in Settings and delete
+          individual reports or all saved records belonging to your current
+          session owner. Disabling history or signing out does not delete
+          existing records. Deletion attempts to remove image files; cleanup
+          failures or device backups may leave copies. Account records remain on
+          the server until the project team removes them; there is no in-app
+          account deletion button. The local administrative tool creates backups
+          before account deletion; the team must separately manage backup
+          retention and deletion.
+        </p>
+      </section>
+      <section>
+        <h2>Security and development limits</h2>
+        <p>
+          Credentials use the platform credential store; history queries are
+          owner-scoped. App-sandbox protection is not a claim of
+          application-level database encryption or guaranteed security.
+          Development builds may use HTTP on a trusted local network and should
+          not carry real sensitive data over untrusted networks. Public account
+          deployment requires HTTPS and operational safeguards. Shared/modified
+          devices and backups can expose data.
+        </p>
+      </section>
+      <section>
+        <h2>Access, correction and rights</h2>
+        <p>
+          View history and edit supported report/profile fields in the app.
+          Contact the team providing your app for server account access,
+          correction, deletion, or backup questions. Applicable rights and
+          exceptions depend on governing law and circumstances. Consult the
+          Philippine National Privacy Commission for data-subject rights. This
+          notice does not claim regulatory certification.
+        </p>
+      </section>
+      <section>
+        <h2>Children and other people</h2>
+        <p>
+          The age field is screening context, not parental consent or age
+          verification. A parent or lawful guardian should oversee use involving
+          children. Do not submit another person’s health information without
+          appropriate authority and consent. The team must establish safeguards
+          for its actual participants and deployment.
+        </p>
+      </section>
+      <section>
+        <h2>Website and external services</h2>
+        <p>
+          These static pages do not include scan/account data in their links,
+          request photos, or contain application analytics/advertising scripts.
+          Your browser and host still receive connection details such as IP
+          address and request headers; hosting security features may log
+          requests or set cookies. External links follow the destination’s
+          privacy practices.
+        </p>
+      </section>
+      <section>
+        <h2>Consent and updates</h2>
+        <p>
+          Read this notice and the medical disclaimer before screening. Agree
+          and Continue stores a local first-run acknowledgment, not a signed
+          medical-consent record. You may stop using the app, revoke
+          permissions, disable future history saving, and request deletion as
+          described above. Opening a browser page does not record consent or
+          delete data. The team must update disclosures when implementation or
+          data practices change.
+        </p>
+      </section>
+      <section>
+        <h2>Further information</h2>
+        <p>
+          <a href="https://privacy.gov.ph/data-subject-rights/"
+            >National Privacy Commission: data-subject rights</a
+          >
+          ·
+          <a href="https://policies.google.com/privacy"
+            >Google Privacy Policy</a
+          >
+        </p>
+      </section>
+    </main>
+    <footer>
+      DermaSight · Educational screening only. Use your browser’s Back control
+      or switch back to the app to return.
+    </footer>
+  </body>
+</html>
