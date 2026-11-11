@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
+﻿import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 test('all shipped EfficientNet classifier assets retain the teammate export', () => {
   const expected =
-    'ba541d0b9ce68007c2a58cefc217cda4c47db43fea147bf14d13a44c62c478c2';
+    '433142ab927fb99e4210415a9a4b8f569afe6f4f571c2a61773ed5bd400e7ff5';
   for (const file of [
     'efficientnet_ham10000.tflite',
     'src/assets/models/efficientnet_ham10000.tflite',

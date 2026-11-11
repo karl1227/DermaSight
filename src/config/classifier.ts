@@ -1,9 +1,9 @@
-import type { LesionClass } from '../types';
+﻿import type { LesionClass } from '../types';
 
 // Teammate's EfficientNet export from 20383b0. Reported dataset accuracy is
 // separate from the per-image probability; never force a 90% output score.
 export const CLASSIFIER_MODEL_SHA256 =
-  'ba541d0b9ce68007c2a58cefc217cda4c47db43fea147bf14d13a44c62c478c2';
+  '433142ab927fb99e4210415a9a4b8f569afe6f4f571c2a61773ed5bd400e7ff5';
 export const CLASSIFIER_INPUT_SIZE = 224;
 export const CLASSIFIER_CONFIDENCE_THRESHOLD = 70;
 

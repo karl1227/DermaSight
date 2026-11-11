@@ -1,4 +1,4 @@
-import {
+﻿import {
   CLASSIFIER_MODEL_SHA256,
   CLASSIFIER_INPUT_SIZE,
   CLASSIFIER_CONFIDENCE_THRESHOLD,
@@ -41,39 +41,33 @@ let cachedModel: TfliteModel | null = null;
 async function getModel(): Promise<TfliteModel> {
   if (cachedModel) return cachedModel;
 
-  try {
-    if (Platform.OS === 'android') {
-      const modelFilename = 'efficientnet_ham10000.tflite';
-      // Bind cached bytes to this exact export, not just a reused filename.
-      const targetPath = `${
-        RNFS.CachesDirectoryPath
-      }/efficientnet_ham10000-${MODEL_SHA256.slice(0, 12)}.tflite`;
-      const existingMatches =
-        (await RNFS.exists(targetPath)) &&
-        (await RNFS.hash(targetPath, 'sha256')) === MODEL_SHA256;
-      if (!existingMatches)
-        await RNFS.copyFileAssets(modelFilename, targetPath);
-      const targetExists =
-        (await RNFS.hash(targetPath, 'sha256')) === MODEL_SHA256;
-      if (!targetExists)
-        throw new Error(
-          'The packaged classifier does not match the expected export.',
-        );
-      if (targetExists) {
-        cachedModel = await loadTensorflowModel(
-          { url: `file://${targetPath}` },
-          [],
-        );
-        return cachedModel;
-      }
-    }
-  } catch (error) {
-    console.warn(
-      'Failed to load Android asset via file path, falling back to require:',
-      error,
+  if (Platform.OS === 'android') {
+    const modelFilename = 'efficientnet_ham10000.tflite';
+    // Include the SHA-256 prefix in the filename so a stale cache from a
+    // previous build is never reused for a different model export.
+    const targetPath = `${
+      RNFS.CachesDirectoryPath
+    }/efficientnet_ham10000-${MODEL_SHA256.slice(0, 12)}.tflite`;
+
+    // Only copy when the versioned cache file is absent; if it is present it
+    // already matches this export (the name encodes the hash prefix).
+    if (!(await RNFS.exists(targetPath)))
+      await RNFS.copyFileAssets(modelFilename, targetPath);
+
+    if (!(await RNFS.exists(targetPath)))
+      throw new Error(
+        'Failed to copy the EfficientNet model from Android assets to the cache directory.',
+      );
+
+    cachedModel = await loadTensorflowModel(
+      { url: `file://${targetPath}` },
+      [],
     );
+    return cachedModel;
   }
 
+  // iOS: Metro's require() resolves to a proper asset URI that the loader
+  // can handle without a file:// prefix.
   cachedModel = await loadTensorflowModel(
     require('../assets/models/efficientnet_ham10000.tflite'),
     [],

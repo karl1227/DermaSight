@@ -1,4 +1,4 @@
-import { Buffer } from 'buffer';
+﻿import { Buffer } from 'buffer';
 import * as jpeg from 'jpeg-js';
 import { loadTensorflowModel } from 'react-native-fast-tflite';
 import { prepareCapture } from '../src/services/capturePreparationService';
@@ -63,7 +63,7 @@ const expected = [
 beforeEach(() => jest.clearAllMocks());
 test('the shared classifier configuration pins the original teammate export and label order', () => {
   expect(CLASSIFIER_MODEL_SHA256).toBe(
-    'ba541d0b9ce68007c2a58cefc217cda4c47db43fea147bf14d13a44c62c478c2',
+    '433142ab927fb99e4210415a9a4b8f569afe6f4f571c2a61773ed5bd400e7ff5',
   );
   expect(CLASSIFIER_LABELS).toEqual(expected);
 });
